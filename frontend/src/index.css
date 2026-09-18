@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --bg-main: #FAF8F5;
+    --text-primary: #18181B;
+    --text-secondary: #52525B;
+    --card-surface: #FFFFFF;
+    --card-border: #F5E8C7;
+    --accent-yellow: #FACC15;
+    --accent-amber: #F59E0B;
+  }
+
+  .dark {
+    --bg-main: #FAF8F5;
+    --text-primary: #18181B;
+    --text-secondary: #52525B;
+    --card-surface: #FFFFFF;
+    --card-border: #F5E8C7;
+    --accent-yellow: #FACC15;
+    --accent-amber: #F59E0B;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    @apply antialiased selection:bg-amber-400 selection:text-stone-900 transition-colors duration-200;
+    font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+}
+
+/* Warm Luxury Card Styles */
+.saas-card {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(245, 158, 11, 0.18);
+  box-shadow: 0 4px 20px -2px rgba(245, 158, 11, 0.06), 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+}
+
+.dark .saas-card {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(245, 158, 11, 0.18);
+  box-shadow: 0 4px 20px -2px rgba(245, 158, 11, 0.06), 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+}
+
+.saas-card-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.saas-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 14px 30px -4px rgba(245, 158, 11, 0.12), 0 0 15px -2px rgba(250, 204, 21, 0.15);
+}
+
+.dark .saas-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 14px 30px -4px rgba(245, 158, 11, 0.12), 0 0 15px -2px rgba(250, 204, 21, 0.15);
+}
+
+/* Warm Inputs */
+.saas-input {
+  background-color: #FFFFFF;
+  border: 1px solid #E4E4E7;
+  color: #18181B;
+  transition: all 0.15s ease-in-out;
+}
+
+.saas-input:focus {
+  border-color: #F59E0B;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+  outline: none;
+}
+
+.dark .saas-input {
+  background-color: #FFFFFF;
+  border: 1px solid #E4E4E7;
+  color: #18181B;
+}
+
+.dark .saas-input:focus {
+  border-color: #F59E0B;
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+}
+
+/* Diagonal Stripe Texture for Frosted Widgets */
+.striped-glass-pattern {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.15),
+    rgba(255, 255, 255, 0.15) 2px,
+    transparent 2px,
+    transparent 8px
+  );
+}
+
+/* Sleek Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E5E7EB;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #D1D5DB;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 158, 11, 0.4);
+}
+
