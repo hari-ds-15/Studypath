@@ -107,24 +107,41 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen })
 
       {/* User Info & Logout Footer */}
       <div className="p-3 border-t border-stone-200/90 dark:border-stone-800/80">
-        <div className="flex items-center gap-3 p-2 rounded-xl bg-white dark:bg-[#1C1917] border border-stone-200/90 dark:border-stone-800/80 shadow-xs">
-          <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 flex items-center justify-center font-bold text-xs shrink-0">
-            {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'S'}
-          </div>
-          {(!isCollapsed || isMobileOpen) && (
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-stone-900 dark:text-stone-100 truncate">{user?.full_name || 'Student'}</p>
-              <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">{user?.email || 'student@studypath.edu'}</p>
+        {(() => {
+          const displayName = (() => {
+            if (user?.full_name && !user.full_name.toLowerCase().includes('studypath student')) {
+              return user.full_name;
+            }
+            if (user?.email) {
+              const raw = user.email.split('@')[0].replace(/[._0-9-]+/g, ' ').trim();
+              if (raw) {
+                return raw.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+              }
+            }
+            return 'Student';
+          })();
+
+          return (
+            <div className="flex items-center gap-3 p-2 rounded-xl bg-white dark:bg-[#1C1917] border border-stone-200/90 dark:border-stone-800/80 shadow-xs">
+              <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 flex items-center justify-center font-bold text-xs shrink-0">
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+              {(!isCollapsed || isMobileOpen) && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-stone-900 dark:text-stone-100 truncate">{displayName}</p>
+                  <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">{user?.email || ''}</p>
+                </div>
+              )}
+              <button
+                onClick={handleLogout}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors shrink-0 cursor-pointer"
+                title="Sign out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
             </div>
-          )}
-          <button
-            onClick={handleLogout}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors shrink-0 cursor-pointer"
-            title="Sign out"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-          </button>
-        </div>
+          );
+        })()}
       </div>
     </div>
   );

@@ -19,27 +19,52 @@ export const AuthProvider = ({ children }) => {
   const [supabaseSession, setSupabaseSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Smart helper to extract user's real name from Google metadata or email
+  const extractRealName = (sbUser, fallback = null) => {
+    if (!sbUser) return fallback || 'Student';
+    const meta = sbUser.user_metadata || {};
+    if (meta.full_name && meta.full_name.trim() && !meta.full_name.toLowerCase().includes('studypath student')) {
+      return meta.full_name.trim();
+    }
+    if (meta.name && meta.name.trim() && !meta.name.toLowerCase().includes('studypath student')) {
+      return meta.name.trim();
+    }
+    if (meta.given_name && meta.given_name.trim()) {
+      return `${meta.given_name} ${meta.family_name || ''}`.trim();
+    }
+    if (fallback && fallback.trim() && !fallback.toLowerCase().includes('studypath student')) {
+      return fallback.trim();
+    }
+    if (sbUser.email) {
+      const raw = sbUser.email.split('@')[0].replace(/[._0-9-]+/g, ' ').trim();
+      if (raw) {
+        return raw.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      }
+    }
+    return 'Student';
+  };
+
   // Sync Supabase user with backend database for study plan / analytics / profile consistency
   const syncWithBackend = async (supabaseUser, fallbackName = null) => {
+    const email = supabaseUser?.email || (supabaseUser?.phone ? `phone_${supabaseUser.phone.replace('+', '')}@studypath.student` : '');
+    const fullName = extractRealName(supabaseUser, fallbackName);
+
     try {
-      const email = supabaseUser?.email || (supabaseUser?.phone ? `phone_${supabaseUser.phone.replace('+', '')}@studypath.student` : null);
-      const fullName = supabaseUser?.user_metadata?.full_name || fallbackName || (email ? email.split('@')[0] : 'Student');
-      
       const res = await api.post('/auth/supabase-sync', {
         supabase_id: supabaseUser?.id,
-        email: supabaseUser?.email || null,
+        email: email || null,
         phone: supabaseUser?.phone || null,
         full_name: fullName,
       });
 
       const { access_token, user_id, onboarding_completed } = res.data;
       const userData = {
-        id: user_id,
+        id: user_id || supabaseUser?.id || 'sb_user',
         supabase_id: supabaseUser?.id,
-        email: res.data.email,
-        full_name: res.data.full_name || fullName,
+        email: email || res.data.email,
+        full_name: fullName || res.data.full_name,
         phone: supabaseUser?.phone || null,
-        onboarding_completed,
+        onboarding_completed: onboarding_completed ?? true,
       };
 
       setToken(access_token);
@@ -52,9 +77,9 @@ export const AuthProvider = ({ children }) => {
       // Fallback to client-only session if backend is restarting
       const userData = {
         id: supabaseUser?.id || 'sb_user',
-        email: supabaseUser?.email || '',
+        email: email,
         phone: supabaseUser?.phone || '',
-        full_name: supabaseUser?.user_metadata?.full_name || fallbackName || 'StudyPath Student',
+        full_name: fullName,
         onboarding_completed: true,
       };
       const tokenString = supabaseUser?.id || 'sb_token_active';

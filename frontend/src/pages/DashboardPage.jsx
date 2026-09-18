@@ -287,6 +287,21 @@ const DashboardPage = () => {
   const topRecs = recommendations.slice(0, 3);
   const currentDaySessions = weeklyPlan?.sessions_by_day?.[selectedDay] || [];
 
+  // Compute actual first name from user full_name or email prefix
+  const userFirstName = (() => {
+    if (user?.full_name && !user.full_name.toLowerCase().includes('studypath student')) {
+      return user.full_name.trim().split(/\s+/)[0];
+    }
+    if (user?.email) {
+      const raw = user.email.split('@')[0].replace(/[._0-9-]+/g, ' ').trim();
+      if (raw) {
+        const first = raw.split(/\s+/)[0];
+        return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+      }
+    }
+    return 'Student';
+  })();
+
   return (
     <div className="space-y-8 select-none">
       {/* Welcome Hero Banner */}
@@ -301,7 +316,7 @@ const DashboardPage = () => {
             AI Academic & Study Optimization Engine Active
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-950 tracking-tight">
-            Welcome back, {user?.full_name?.split(' ')[0] || 'Alex'}! 👋
+            Welcome back, {userFirstName}! 👋
           </h1>
           <p className="text-xs sm:text-sm text-stone-900 max-w-xl font-semibold">
             Weekly Target: <span className="font-extrabold text-stone-950">{profile?.weekly_target_hours || 20} hours</span> • Strategy: <span className="font-extrabold text-stone-950">{profile?.learning_speed || 'Balanced'} Pace</span>. You have{' '}

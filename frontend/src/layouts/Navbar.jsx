@@ -53,6 +53,19 @@ const Navbar = ({ isCollapsed, onMobileMenuToggle }) => {
     }
   };
 
+  const displayName = (() => {
+    if (user?.full_name && !user.full_name.toLowerCase().includes('studypath student')) {
+      return user.full_name;
+    }
+    if (user?.email) {
+      const raw = user.email.split('@')[0].replace(/[._0-9-]+/g, ' ').trim();
+      if (raw) {
+        return raw.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      }
+    }
+    return 'Student';
+  })();
+
   return (
     <header
       className={`
@@ -185,17 +198,17 @@ const Navbar = ({ isCollapsed, onMobileMenuToggle }) => {
             className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800/80 transition-colors border border-stone-200 dark:border-stone-800 cursor-pointer"
           >
             <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-400 text-stone-950 flex items-center justify-center font-bold text-xs shadow-xs">
-              {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'S'}
+              {displayName.charAt(0).toUpperCase()}
             </div>
-            <span className="hidden lg:block text-xs font-semibold text-stone-800 dark:text-stone-200 max-w-[90px] truncate">
-              {user?.full_name || 'Student'}
+            <span className="hidden lg:block text-xs font-semibold text-stone-800 dark:text-stone-200 max-w-[120px] truncate">
+              {displayName}
             </span>
           </button>
 
           {showProfileMenu && (
             <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-[#1C1917] border border-stone-200 dark:border-stone-800 shadow-2xl py-2 z-50">
               <div className="px-4 py-2 border-b border-stone-100 dark:border-stone-800">
-                <p className="text-xs font-bold text-stone-900 dark:text-white truncate">{user?.full_name}</p>
+                <p className="text-xs font-bold text-stone-900 dark:text-white truncate">{displayName}</p>
                 <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate">{user?.email}</p>
               </div>
 

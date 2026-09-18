@@ -113,12 +113,26 @@ api.interceptors.response.use(
       }
 
       if (url.includes('/auth/supabase-sync') || url.includes('/auth/login') || url.includes('/auth/register')) {
+        let reqData = {};
+        try {
+          reqData = typeof error.config?.data === 'string' ? JSON.parse(error.config.data) : (error.config?.data || {});
+        } catch {
+          reqData = {};
+        }
+
+        const email = reqData.email || 'student@studypath.edu';
+        let fullName = reqData.full_name;
+        if (!fullName || fullName === 'StudyPath Student') {
+          const raw = email.split('@')[0].replace(/[._0-9-]+/g, ' ').trim();
+          fullName = raw ? raw.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') : 'Student';
+        }
+
         const fallbackToken = {
           access_token: 'sb_vercel_active_token',
           token_type: 'bearer',
-          user_id: 1,
-          email: 'student@studypath.edu',
-          full_name: 'StudyPath Student',
+          user_id: reqData.supabase_id || 1,
+          email: email,
+          full_name: fullName,
           onboarding_completed: true,
         };
         return Promise.resolve({ data: fallbackToken, status: 200, statusText: 'OK' });
