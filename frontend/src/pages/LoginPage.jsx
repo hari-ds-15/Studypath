@@ -23,7 +23,7 @@ import Modal from '../components/common/Modal';
 import api from '../services/api';
 
 const LoginPage = () => {
-  const { loginWithEmail, loginWithGoogle, loginAsGuest } = useAuth();
+  const { loginWithEmail, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   // Email State
@@ -35,7 +35,6 @@ const LoginPage = () => {
   // UI Status
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [guestLoading, setGuestLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [shake, setShake] = useState(false);
@@ -96,29 +95,11 @@ const LoginPage = () => {
       await loginWithGoogle();
     } catch (err) {
       console.error('Google Sign In error:', err);
-      const msg = err?.message || 'Google OAuth is pending setup in Supabase. You can use Email Login or 1-Click Instant Access below!';
+      const msg = err?.message || 'Google Sign In could not complete. Please try signing in with email and password.';
       setError(msg);
       setShake(true);
       setTimeout(() => setShake(false), 500);
       setGoogleLoading(false);
-    }
-  };
-
-  // 2. Instant 1-Click Guest / Demo Login
-  const handleGuestLogin = async () => {
-    setGuestLoading(true);
-    setError('');
-    try {
-      await loginAsGuest('Harinadh Reddy', 'harinadh@studypath.student');
-      setIsSuccess(true);
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 400);
-    } catch (err) {
-      console.error('Guest login error:', err);
-      setError('Instant access failed. Please try Email Login.');
-    } finally {
-      setGuestLoading(false);
     }
   };
 
@@ -297,17 +278,9 @@ const LoginPage = () => {
               {/* EMAIL + PASSWORD AUTH FORM                                */}
               {/* ========================================================= */}
               <form onSubmit={handleEmailSubmit} className="space-y-4">
-                {/* Quick Demo Autofill Pill */}
+                {/* Email Label */}
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-stone-900">Email Address</span>
-                  <button
-                    type="button"
-                    onClick={handleAutofillDemo}
-                    className="text-[11px] font-black text-amber-800 hover:text-amber-950 bg-amber-200/80 hover:bg-amber-300/80 px-2 py-0.5 rounded-full border border-amber-300 transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    <Sparkles className="w-3 h-3 text-amber-800 fill-current" />
-                    Quick Demo Autofill
-                  </button>
+                  <label className="text-xs font-extrabold text-stone-900">Email Address</label>
                 </div>
 
                 <div className="relative">
@@ -397,21 +370,6 @@ const LoginPage = () => {
                     </>
                   )}
                 </button>
-
-                {/* 1-Click Instant Demo Access Button */}
-                <button
-                  type="button"
-                  onClick={handleGuestLogin}
-                  disabled={guestLoading || isSuccess}
-                  className="w-full py-2.5 px-4 bg-amber-100/90 hover:bg-amber-200/90 border border-amber-300 rounded-2xl font-black text-xs text-amber-950 flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer shadow-xs"
-                >
-                  {guestLoading ? (
-                    <div className="w-3.5 h-3.5 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5 text-amber-800 fill-current" />
-                  )}
-                  <span>1-Click Instant Student Login ➔</span>
-                </button>
               </form>
             </div>
 
@@ -497,47 +455,6 @@ const LoginPage = () => {
                       )}
                     </div>
                   ))}
-                </div>
-              </div>
-            </div>
-
-            {/* BOTTOM WIDGET: ACTING STUDENT IN LAPTOP SEARCHING COURSES */}
-            <div className="relative z-10 mt-4">
-              <div className="p-4 rounded-2xl bg-white/95 backdrop-blur-md border border-amber-200/90 shadow-lg space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-stone-950 text-amber-300 flex items-center justify-center font-bold text-xs">
-                      🎓
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-stone-950">
-                        Live AI Course Matcher
-                      </h4>
-                      <p className="text-[10px] font-bold text-stone-600">
-                        Active Student Searching Verified Courses
-                      </p>
-                    </div>
-                  </div>
-
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
-                    Live Match
-                  </span>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/70 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-bold text-stone-900">
-                    <Search className="w-3.5 h-3.5 text-amber-700" />
-                    <span>Full-Stack AI & Data Science</span>
-                  </div>
-                  <span className="text-[11px] font-black text-amber-900">18 Certified Courses</span>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] font-bold text-stone-700 px-1 pt-0.5">
-                  <span>Stanford • MIT • YouTube Direct</span>
-                  <span className="text-emerald-700 font-extrabold flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 fill-current" />
-                    100% Free Resources
-                  </span>
                 </div>
               </div>
             </div>
