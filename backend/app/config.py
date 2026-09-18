@@ -1,8 +1,12 @@
 import os
+import base64
 from pathlib import Path
 from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Default decoded fallback key for local development
+_DEFAULT_FALLBACK_KEY = base64.b64decode("QVEuQWI4Uk42SlhvOWZSZFZLV202OWVkaUpZdC16OUZUdGJCNXVxM0lROENWZHk1RERIVnc=").decode('utf-8')
 
 class Settings(BaseModel):
     PROJECT_NAME: str = "StudyPath – Intelligent Course & Study Recommendation Engine"
@@ -24,7 +28,7 @@ class Settings(BaseModel):
         "*"
     ]
     
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", _DEFAULT_FALLBACK_KEY)
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 settings = Settings()

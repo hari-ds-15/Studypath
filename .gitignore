@@ -23,7 +23,11 @@ ENV/
 *.sqlite3
 
 # Environment Variables & Secrets (Keep secret keys private)
+.env
+.env.*
 backend/.env
+frontend/.env
+frontend/.env.*
 .env.local
 .env.development.local
 .env.test.local
