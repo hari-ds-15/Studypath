@@ -23,7 +23,7 @@ import Modal from '../components/common/Modal';
 import api from '../services/api';
 
 const LoginPage = () => {
-  const { loginWithEmail, loginWithGoogle } = useAuth();
+  const { loginWithEmail, loginWithGoogle, loginAsGuest } = useAuth();
   const navigate = useNavigate();
 
   // Email State
@@ -35,6 +35,7 @@ const LoginPage = () => {
   // UI Status
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [shake, setShake] = useState(false);
@@ -95,11 +96,29 @@ const LoginPage = () => {
       await loginWithGoogle();
     } catch (err) {
       console.error('Google Sign In error:', err);
-      const msg = err?.message || 'Google Sign In could not complete. You can also sign in with email and password below.';
+      const msg = err?.message || 'Google OAuth is pending setup in Supabase. You can use Email Login or 1-Click Instant Access below!';
       setError(msg);
       setShake(true);
       setTimeout(() => setShake(false), 500);
       setGoogleLoading(false);
+    }
+  };
+
+  // 2. Instant 1-Click Guest / Demo Login
+  const handleGuestLogin = async () => {
+    setGuestLoading(true);
+    setError('');
+    try {
+      await loginAsGuest('Harinadh Reddy', 'harinadh@studypath.student');
+      setIsSuccess(true);
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 400);
+    } catch (err) {
+      console.error('Guest login error:', err);
+      setError('Instant access failed. Please try Email Login.');
+    } finally {
+      setGuestLoading(false);
     }
   };
 
@@ -377,6 +396,21 @@ const LoginPage = () => {
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
+                </button>
+
+                {/* 1-Click Instant Demo Access Button */}
+                <button
+                  type="button"
+                  onClick={handleGuestLogin}
+                  disabled={guestLoading || isSuccess}
+                  className="w-full py-2.5 px-4 bg-amber-100/90 hover:bg-amber-200/90 border border-amber-300 rounded-2xl font-black text-xs text-amber-950 flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer shadow-xs"
+                >
+                  {guestLoading ? (
+                    <div className="w-3.5 h-3.5 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 text-amber-800 fill-current" />
+                  )}
+                  <span>1-Click Instant Student Login ➔</span>
                 </button>
               </form>
             </div>

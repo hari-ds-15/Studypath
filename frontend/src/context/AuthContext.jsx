@@ -171,7 +171,25 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * 4. Logout User
+   * 4. 1-Click Instant Demo / Guest Login
+   */
+  const loginAsGuest = async (customName = "Alex Chen", customEmail = "alex.chen@studypath.edu") => {
+    const guestUser = {
+      id: "guest_student_01",
+      email: customEmail,
+      full_name: customName,
+      onboarding_completed: true,
+    };
+    const tokenString = "demo_token_active";
+    setToken(tokenString);
+    setUser(guestUser);
+    localStorage.setItem('studypath_token', tokenString);
+    localStorage.setItem('studypath_user', JSON.stringify(guestUser));
+    return guestUser;
+  };
+
+  /**
+   * 5. Logout User
    */
   const logout = async () => {
     try {
@@ -204,6 +222,7 @@ export const AuthProvider = ({ children }) => {
         login: loginWithEmail,
         loginWithEmail,
         loginWithGoogle,
+        loginAsGuest,
         register: registerWithEmail,
         registerWithEmail,
         logout,
