@@ -230,6 +230,109 @@ export const FALLBACK_COURSES = [
   }
 ];
 
+export const FALLBACK_ELECTIVES = [
+  {
+    course_id: 101,
+    id: 101,
+    course_name: "Generative AI & Large Language Models (LLMs)",
+    code: "CS-505",
+    category: "AI & ML",
+    difficulty: "Advanced",
+    credits: 4,
+    match_score: 95.0,
+    career_relevance: "Directly aligns with AI Engineer and LLM Architect career pathways",
+    prerequisites: ["Python Programming", "Machine Learning Fundamentals"],
+    tags: ["LLMs", "RAG", "Transformers", "Prompt Engineering"],
+    is_saved: false,
+    description: "Hands-on engineering course covering transformer architectures, Retrieval-Augmented Generation (RAG), parameter-efficient fine-tuning (LoRA), and high-throughput serving.",
+    free_resources: [
+      {
+        type: "youtube",
+        title: "Andrej Karpathy - Let's build GPT: from scratch, in code",
+        url: "https://www.youtube.com/watch?v=kCc8FmEb1nY",
+        author: "Andrej Karpathy",
+        badge: "Deep Dive",
+        description: "Build a nanoGPT character-level transformer from scratch with PyTorch."
+      }
+    ]
+  },
+  {
+    course_id: 102,
+    id: 102,
+    course_name: "Distributed Systems & Scalable Database Architecture",
+    code: "CS-512",
+    category: "Cloud & DevOps",
+    difficulty: "Advanced",
+    credits: 4,
+    match_score: 91.0,
+    career_relevance: "Crucial for Backend Architects & Distributed Systems Engineers",
+    prerequisites: ["Data Structures & Algorithms", "Database Systems & SQL"],
+    tags: ["Distributed Systems", "Raft", "Sharding", "Consensus"],
+    is_saved: false,
+    description: "Master CAP theorem, consensus protocols (Raft, Paxos), horizontal sharding, event-driven streaming with Kafka, and high availability systems.",
+    free_resources: [
+      {
+        type: "youtube",
+        title: "MIT 6.824: Distributed Systems Lectures",
+        url: "https://www.youtube.com/playlist?list=PLrw6a1wE39_tb2fErI4-WkMbsvGQk9_UB",
+        author: "MIT OpenCourseWare",
+        badge: "University Series",
+        description: "Full MIT course on distributed storage, fault tolerance, and consensus."
+      }
+    ]
+  },
+  {
+    course_id: 103,
+    id: 103,
+    course_name: "Cybersecurity, Cryptography & Network Defense",
+    code: "CS-420",
+    category: "Cybersecurity",
+    difficulty: "Intermediate",
+    credits: 3,
+    match_score: 87.0,
+    career_relevance: "Industry standard for Cybersecurity Specialists & Security Analysts",
+    prerequisites: ["Computer Networks", "Operating Systems"],
+    tags: ["Cybersecurity", "Zero Trust", "Penetration Testing", "Cryptography"],
+    is_saved: false,
+    description: "Covers public key cryptography, zero-trust network models, penetration testing methodologies, vulnerability assessments, and secure coding standards.",
+    free_resources: [
+      {
+        type: "youtube",
+        title: "freeCodeCamp - Certified Ethical Hacker (CEH) Course",
+        url: "https://www.youtube.com/watch?v=3Kq1MIfTWCE",
+        author: "freeCodeCamp.org",
+        badge: "Certification Prep",
+        description: "Full network defense and ethical hacking foundation walkthrough."
+      }
+    ]
+  },
+  {
+    course_id: 104,
+    id: 104,
+    course_name: "High-Performance Data Engineering with Apache Spark & Kafka",
+    code: "CS-440",
+    category: "Data Science",
+    difficulty: "Advanced",
+    credits: 4,
+    match_score: 89.0,
+    career_relevance: "Essential for Big Data Engineers & Data Pipeline Architects",
+    prerequisites: ["Python Programming", "Database Systems & SQL"],
+    tags: ["Spark", "Kafka", "Data Lakehouse", "ETL Pipelines"],
+    is_saved: false,
+    description: "Design real-time streaming pipelines, batch processing with PySpark, Delta Lake table formats, and automated DAG scheduling with Apache Airflow.",
+    free_resources: [
+      {
+        type: "youtube",
+        title: "freeCodeCamp - Data Engineering Course for Beginners",
+        url: "https://www.youtube.com/watch?v=qWru-b6m030",
+        author: "freeCodeCamp.org",
+        badge: "Full Course",
+        description: "Build streaming ETL pipelines with modern data engineering stack."
+      }
+    ]
+  }
+];
+
 export const FALLBACK_PROFILE = {
   user_id: 1,
   education_level: "Undergraduate",
@@ -266,68 +369,6 @@ export const FALLBACK_ANALYTICS = {
   ]
 };
 
-export const FALLBACK_STUDY_PLAN = {
-  weekly_target_hours: 20,
-  total_scheduled_hours: 18.5,
-  sessions: [
-    {
-      id: 1,
-      title: "Machine Learning Foundations",
-      subject: "AI & ML",
-      day_of_week: "Monday",
-      start_time: "09:00",
-      end_time: "10:30",
-      session_type: "Video",
-      is_completed: true,
-      notes: "Watch StatQuest gradient descent video lecture."
-    },
-    {
-      id: 2,
-      title: "LeetCode Practice: Graph BFS/DFS",
-      subject: "Data Structures",
-      day_of_week: "Monday",
-      start_time: "17:00",
-      end_time: "18:30",
-      session_type: "Practice",
-      is_completed: false,
-      notes: "Solve 3 graph traversal problems on sandbox."
-    },
-    {
-      id: 3,
-      title: "Neural Networks Backpropagation",
-      subject: "AI & ML",
-      day_of_week: "Tuesday",
-      start_time: "10:00",
-      end_time: "11:30",
-      session_type: "Video",
-      is_completed: false,
-      notes: "Karpathy micrograd walkthrough."
-    },
-    {
-      id: 4,
-      title: "Full-Stack API Integration Lab",
-      subject: "Web Development",
-      day_of_week: "Wednesday",
-      start_time: "15:00",
-      end_time: "16:30",
-      session_type: "Practice",
-      is_completed: false,
-      notes: "Connect React frontend to FastAPI endpoints."
-    },
-    {
-      id: 5,
-      title: "Module Diagnostic Assessment",
-      subject: "Computer Science",
-      day_of_week: "Friday",
-      start_time: "18:00",
-      end_time: "19:00",
-      session_type: "Quiz",
-      is_completed: false,
-      notes: "Timed 15-minute diagnostic quiz on algorithms."
-    }
-  ]
-};
-
 export const FALLBACK_QUIZZES = [
   {
     id: 1,
@@ -337,6 +378,7 @@ export const FALLBACK_QUIZZES = [
     difficulty: "Intermediate",
     time_limit_minutes: 15,
     total_questions: 5,
+    passing_score: 70,
     questions: [
       {
         id: 1,
@@ -351,6 +393,27 @@ export const FALLBACK_QUIZZES = [
         options: ["High Bias (Underfitting)", "High Variance (Overfitting)", "Zero Loss", "Infinite Precision"],
         correct_index: 0,
         explanation: "Overly simplistic models suffer from High Bias because they cannot capture the underlying structure of the data."
+      },
+      {
+        id: 3,
+        question_text: "In gradient descent optimization, what is the role of the learning rate parameter η?",
+        options: ["Controls the step size taken in the direction of the negative gradient", "Computes the exact inverse Hessian matrix", "Determines the number of hidden layers", "Acts as the regularization loss weight"],
+        correct_index: 0,
+        explanation: "The learning rate scales the magnitude of parameter updates along the gradient surface."
+      },
+      {
+        id: 4,
+        question_text: "Which metric is most critical when evaluating a medical diagnostic model where false negatives are dangerous?",
+        options: ["Recall (Sensitivity)", "Precision", "Accuracy alone", "Specificity"],
+        correct_index: 0,
+        explanation: "Recall minimizes false negatives by capturing all true positive cases."
+      },
+      {
+        id: 5,
+        question_text: "What is the primary benefit of K-Fold Cross Validation?",
+        options: ["Provides an unbiased estimate of model generalization performance across all subsets", "Speeds up model training time by 10x", "Eliminates the need for validation data completely", "Guarantees 100% test accuracy"],
+        correct_index: 0,
+        explanation: "K-Fold evaluates model performance across k different splits, preventing split bias."
       }
     ]
   },
@@ -362,6 +425,7 @@ export const FALLBACK_QUIZZES = [
     difficulty: "Advanced",
     time_limit_minutes: 20,
     total_questions: 5,
+    passing_score: 70,
     questions: [
       {
         id: 1,
@@ -369,7 +433,107 @@ export const FALLBACK_QUIZZES = [
         options: ["O(log N)", "O(N)", "O(1)", "O(N log N)"],
         correct_index: 0,
         explanation: "Balanced binary search trees maintain height at O(log N), guaranteeing logarithmic search time."
+      },
+      {
+        id: 2,
+        question_text: "Which algorithm finds the single-source shortest path on a weighted graph with non-negative edge weights in O((V + E) log V) time?",
+        options: ["Dijkstra's Algorithm with Min-Heap", "Bellman-Ford Algorithm", "Floyd-Warshall Algorithm", "Breadth-First Search (BFS)"],
+        correct_index: 0,
+        explanation: "Dijkstra with a priority queue min-heap achieves O((V+E) log V) time complexity."
+      },
+      {
+        id: 3,
+        question_text: "What is the worst-case time complexity of QuickSort when pivot selection is consistently poor (e.g. smallest element)?",
+        options: ["O(N^2)", "O(N log N)", "O(N)", "O(log N)"],
+        correct_index: 0,
+        explanation: "Poor pivot selection degrades QuickSort recursion depth to O(N), resulting in O(N^2) quadratic time."
+      },
+      {
+        id: 4,
+        question_text: "How does Dynamic Programming optimize recursive problems with overlapping subproblems?",
+        options: ["By memoizing (caching) previously calculated subproblem results to avoid redundant work", "By running parallel threads on the CPU", "By converting recursion into random permutations", "By reducing space complexity to O(1) in all cases"],
+        correct_index: 0,
+        explanation: "Memoization and tabulation store subproblem solutions, converting exponential time into polynomial time."
+      },
+      {
+        id: 5,
+        question_text: "Which data structure is ideal for implementing LRU (Least Recently Used) Cache with O(1) get and put operations?",
+        options: ["Hash Map + Doubly Linked List", "Binary Search Tree + Stack", "Array + Queue", "Single Linked List alone"],
+        correct_index: 0,
+        explanation: "A Hash Map provides O(1) key lookups while a Doubly Linked List provides O(1) node removal and insertion."
       }
     ]
+  },
+  {
+    id: 3,
+    course_id: 3,
+    title: "SQL & Database Systems Diagnostic",
+    description: "Assess your mastery of ACID properties, indexing mechanisms, JOINs, and query optimization.",
+    difficulty: "Intermediate",
+    time_limit_minutes: 15,
+    total_questions: 5,
+    passing_score: 70,
+    questions: [
+      {
+        id: 1,
+        question_text: "Which ACID property ensures that committed transactions remain permanent even after a power crash?",
+        options: ["Durability", "Atomicity", "Consistency", "Isolation"],
+        correct_index: 0,
+        explanation: "Durability guarantees that committed state changes are safely recorded to non-volatile storage (write-ahead log)."
+      },
+      {
+        id: 2,
+        question_text: "What is the difference between WHERE and HAVING clauses in SQL?",
+        options: ["WHERE filters rows before aggregation; HAVING filters aggregated group results", "HAVING cannot be used with GROUP BY", "WHERE only works on strings, HAVING on numbers", "There is no functional difference"],
+        correct_index: 0,
+        explanation: "WHERE filters candidate rows before grouping, whereas HAVING filters aggregate calculations like COUNT or AVG."
+      },
+      {
+        id: 3,
+        question_text: "Which index structure is the standard for range queries (e.g. BETWEEN 10 AND 50) in relational databases like PostgreSQL and MySQL?",
+        options: ["B-Tree Index", "Hash Index", "Bitmap Index", "Full-Text Index"],
+        correct_index: 0,
+        explanation: "B-Tree indexes store sorted leaf node chains, enabling efficient range scans and binary search lookups."
+      },
+      {
+        id: 4,
+        question_text: "What does 3NF (Third Normal Form) require in relational database design?",
+        options: ["Every non-prime attribute must depend directly on the primary key, eliminating transitive dependencies", "All tables must have exactly three columns", "Tables cannot have foreign keys", "Data must be stored in duplicate rows for redundancy"],
+        correct_index: 0,
+        explanation: "3NF eliminates transitive dependencies (if A -> B and B -> C, then C should be in its own entity)."
+      },
+      {
+        id: 5,
+        question_text: "Which JOIN type returns all records from the left table and only matched records from the right table?",
+        options: ["LEFT OUTER JOIN", "INNER JOIN", "FULL OUTER JOIN", "CROSS JOIN"],
+        correct_index: 0,
+        explanation: "LEFT JOIN preserves all rows from the primary left relation, filling unmatched right fields with NULL."
+      }
+    ]
+  }
+];
+
+export const FALLBACK_QUIZ_HISTORY = [
+  {
+    id: 1,
+    quiz_id: 1,
+    quiz_title: "Machine Learning Fundamentals & Scikit-Learn Diagnostic",
+    score_percentage: 100.0,
+    passed: true,
+    total_questions: 5,
+    correct_count: 5,
+    time_spent_seconds: 240,
+    created_at: new Date(Date.now() - 86400000).toISOString()
+  },
+  {
+    id: 2,
+    quiz_id: 2,
+    quiz_title: "Data Structures & Time Complexity Diagnostic",
+    score_percentage: 80.0,
+    passed: true,
+    total_questions: 5,
+    correct_count: 4,
+    time_spent_seconds: 360,
+    created_at: new Date(Date.now() - 172800000).toISOString()
   }
 ];

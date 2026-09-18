@@ -1,10 +1,11 @@
 import axios from 'axios';
 import {
   FALLBACK_COURSES,
+  FALLBACK_ELECTIVES,
   FALLBACK_PROFILE,
   FALLBACK_ANALYTICS,
-  FALLBACK_STUDY_PLAN,
-  FALLBACK_QUIZZES
+  FALLBACK_QUIZZES,
+  FALLBACK_QUIZ_HISTORY
 } from './mockData';
 import { askGemini } from './geminiService';
 import {
@@ -18,7 +19,7 @@ import {
   deleteStudySession
 } from './studyPlanEngine';
 
-// Dynamically compute API base URL so mobile phones & cross-device laptops on LAN connect to the host backend
+// Dynamically compute API base URL
 const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
@@ -38,7 +39,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 4000,
+  timeout: 3000,
 });
 
 // Request interceptor: attach JWT bearer token if present
@@ -53,7 +54,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor: handle 401 & provide intelligent Vercel fallback data for offline/standalone mode
+// Response interceptor: provide seamless fallback for offline & Vercel deployment
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -71,21 +72,48 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // If backend is unreachable (e.g. on Vercel deployment or mobile without local python backend), provide seamless fallback
+    // Standalone / Vercel offline router
     if (!error.response || error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
-      console.info(`[StudyPath Standalone/Vercel Mode] Serving fallback data for: [${method.toUpperCase()}] ${url}`);
+      console.info(`[StudyPath Standalone/Vercel Mode] Serving fallback for: [${method.toUpperCase()}] ${url}`);
 
-      // 1. Courses & Recommendations
+      // 1. Recommendations & Courses
+      if (url.includes('/recommendations/electives')) {
+        return Promise.resolve({ data: FALLBACK_ELECTIVES, status: 200, statusText: 'OK' });
+      }
+
       if (url.includes('/recommendations/courses') || url.includes('/courses')) {
+        // Saved list
+        if (url.includes('/courses/saved/list')) {
+          const savedCourses = FALLBACK_COURSES.filter(c => c.is_saved);
+          return Promise.resolve({ data: savedCourses.length > 0 ? savedCourses : [FALLBACK_COURSES[1]], status: 200, statusText: 'OK' });
+        }
+
+        // Toggle Save
+        if (url.includes('/save')) {
+          return Promise.resolve({ data: { saved: true, message: 'Bookmark updated' }, status: 200, statusText: 'OK' });
+        }
+
+        // Toggle Enroll
+        if (url.includes('/enroll')) {
+          return Promise.resolve({ data: { enrolled: true, message: 'Enrolled successfully' }, status: 200, statusText: 'OK' });
+        }
+
+        // Single course detail
         if (url.match(/\/courses\/\d+$/)) {
           const id = parseInt(url.split('/').pop(), 10);
-          const course = FALLBACK_COURSES.find((c) => c.course_id === id) || FALLBACK_COURSES[0];
+          const course = FALLBACK_COURSES.find((c) => c.course_id === id) || FALLBACK_ELECTIVES.find((c) => c.course_id === id) || FALLBACK_COURSES[0];
           return Promise.resolve({ data: course, status: 200, statusText: 'OK' });
         }
+
+        // Refresh recommendations
+        if (url.includes('/recommendations/refresh')) {
+          return Promise.resolve({ data: { success: true, message: 'Recommendation models recalibrated' }, status: 200, statusText: 'OK' });
+        }
+
         return Promise.resolve({ data: FALLBACK_COURSES, status: 200, statusText: 'OK' });
       }
 
-      // 2. Student Profile (Persistent in localStorage)
+      // 2. Student Profile (Persistent)
       if (url.includes('/student/profile') || url.includes('/auth/me')) {
         if (method === 'put' || method === 'post' || method === 'patch') {
           let reqData = {};
@@ -95,7 +123,6 @@ api.interceptors.response.use(
             reqData = {};
           }
           const savedProfile = saveStoredProfile(reqData);
-          // Automatically recalculate & update the AI study plan with the new profile parameters!
           generateAiStudyPlan(savedProfile);
           return Promise.resolve({ data: savedProfile, status: 200, statusText: 'OK' });
         }
@@ -109,15 +136,13 @@ api.interceptors.response.use(
         return Promise.resolve({ data: FALLBACK_ANALYTICS, status: 200, statusText: 'OK' });
       }
 
-      // 4. Study Plan (Dynamic AI generation, toggle, add, update, delete)
+      // 4. Study Plan (Dynamic AI Generation & CRUD)
       if (url.includes('/study-plan')) {
-        // Auto-generate AI study plan
         if (url.includes('/study-plan/generate')) {
           const newPlan = generateAiStudyPlan();
           return Promise.resolve({ data: newPlan, status: 200, statusText: 'OK' });
         }
 
-        // Toggle completed session
         if (url.includes('/toggle-complete')) {
           const parts = url.split('/');
           const toggleIndex = parts.indexOf('toggle-complete');
@@ -126,14 +151,12 @@ api.interceptors.response.use(
           return Promise.resolve({ data: res, status: 200, statusText: 'OK' });
         }
 
-        // Delete session
         if (method === 'delete') {
           const id = parseInt(url.split('/').pop(), 10);
           const res = deleteStudySession(id);
           return Promise.resolve({ data: res, status: 200, statusText: 'OK' });
         }
 
-        // Update session
         if (method === 'put') {
           const id = parseInt(url.split('/').pop(), 10);
           let reqData = {};
@@ -146,7 +169,6 @@ api.interceptors.response.use(
           return Promise.resolve({ data: res, status: 200, statusText: 'OK' });
         }
 
-        // Add new session
         if (method === 'post') {
           let reqData = {};
           try {
@@ -158,22 +180,94 @@ api.interceptors.response.use(
           return Promise.resolve({ data: res, status: 200, statusText: 'OK' });
         }
 
-        // Get weekly plan
         const plan = computeWeeklyPlan();
         return Promise.resolve({ data: plan, status: 200, statusText: 'OK' });
       }
 
-      // 5. Quizzes
+      // 5. Diagnostic Quizzes & Submissions
       if (url.includes('/quizzes')) {
+        // Quiz History
+        if (url.includes('/quizzes/history/list')) {
+          let historyList = [];
+          try {
+            const savedHist = localStorage.getItem('studypath_quiz_history');
+            historyList = savedHist ? JSON.parse(savedHist) : FALLBACK_QUIZ_HISTORY;
+          } catch {
+            historyList = FALLBACK_QUIZ_HISTORY;
+          }
+          return Promise.resolve({ data: historyList, status: 200, statusText: 'OK' });
+        }
+
+        // Quiz Submit
+        if (url.includes('/submit')) {
+          const quizId = parseInt(url.split('/')[2] || url.split('/').slice(-2)[0], 10);
+          let reqData = {};
+          try {
+            reqData = typeof originalRequest.data === 'string' ? JSON.parse(originalRequest.data) : (originalRequest.data || {});
+          } catch {
+            reqData = {};
+          }
+
+          const targetQuiz = FALLBACK_QUIZZES.find(q => q.id === quizId) || FALLBACK_QUIZZES[0];
+          const userAnswers = reqData.answers || [];
+          let correct = 0;
+
+          targetQuiz.questions.forEach((q) => {
+            const given = userAnswers.find(a => a.question_id === q.id);
+            if (given && given.selected_option_index === q.correct_index) {
+              correct++;
+            }
+          });
+
+          const total = targetQuiz.questions.length;
+          const score = Math.round((correct / total) * 100);
+          const passed = score >= (targetQuiz.passing_score || 70);
+
+          const resultData = {
+            quiz_id: quizId,
+            score_percentage: score,
+            passed: passed,
+            total_questions: total,
+            correct_count: correct,
+            wrong_count: total - correct,
+            time_spent_seconds: reqData.time_spent_seconds || 180,
+            feedback: passed ? "Outstanding work! You demonstrated strong conceptual understanding." : "Good effort! Review the question explanations to strengthen your knowledge."
+          };
+
+          // Save to quiz history
+          try {
+            const savedHist = localStorage.getItem('studypath_quiz_history');
+            const list = savedHist ? JSON.parse(savedHist) : [...FALLBACK_QUIZ_HISTORY];
+            list.unshift({
+              id: Date.now(),
+              quiz_id: quizId,
+              quiz_title: targetQuiz.title,
+              score_percentage: score,
+              passed: passed,
+              total_questions: total,
+              correct_count: correct,
+              time_spent_seconds: reqData.time_spent_seconds || 180,
+              created_at: new Date().toISOString()
+            });
+            localStorage.setItem('studypath_quiz_history', JSON.stringify(list));
+          } catch (e) {
+            console.error('Failed to save quiz attempt history:', e);
+          }
+
+          return Promise.resolve({ data: resultData, status: 200, statusText: 'OK' });
+        }
+
+        // Single Quiz Detail
         if (url.match(/\/quizzes\/\d+$/)) {
           const id = parseInt(url.split('/').pop(), 10);
           const quiz = FALLBACK_QUIZZES.find((q) => q.id === id) || FALLBACK_QUIZZES[0];
           return Promise.resolve({ data: quiz, status: 200, statusText: 'OK' });
         }
+
         return Promise.resolve({ data: FALLBACK_QUIZZES, status: 200, statusText: 'OK' });
       }
 
-      // 6. Intelligent AI Chatbot Engine for StudyPath (Standalone & Vercel)
+      // 6. Intelligent AI Chatbot Engine for StudyPath
       if (url.includes('/chat/suggestions')) {
         return Promise.resolve({
           data: [
@@ -220,7 +314,7 @@ api.interceptors.response.use(
         const userObj = savedUser ? JSON.parse(savedUser) : null;
         const firstName = userObj?.full_name?.split(' ')[0] || (userObj?.email ? userObj.email.split('@')[0] : 'Student');
 
-        // 1. Try Direct Google Gemini Flash API first!
+        // 1. Try Live Google Gemini Flash API first!
         try {
           const geminiRes = await askGemini(msg, firstName);
           if (geminiRes && geminiRes.response) {
@@ -240,20 +334,28 @@ api.interceptors.response.use(
             });
           }
         } catch (geminiError) {
-          console.warn('[StudyPath AI] Direct Gemini API failed, using intelligent offline knowledge base:', geminiError);
+          console.warn('[StudyPath AI] Direct Gemini API failed, using intelligent offline response:', geminiError);
         }
 
-        // 2. Offline / Knowledge Base Fallback
+        // 2. Intelligent Topic-Specific Response Generator
         const clean = msg.trim().toLowerCase();
         let botReply = '';
         let followups = [];
 
-        if (/^(hi|hello|hey|howdy|good morning|good evening|yo)\b/i.test(clean)) {
-          botReply = `👋 Hello **${firstName}**! Great to see you!\n\nI am your **StudyPath AI Tutor**. Here are a few things we can do together right now:\n* 🧠 **Master algorithms & data structures** (Binary Search, Trees, Graphs, DP)\n* 💻 **Write & debug clean code** in Python, JavaScript, SQL, or C++\n* 📅 **Build customized revision timetables** for your exams\n* 📝 **Generate rapid-fire diagnostic quiz questions**\n\nWhat subject or topic would you like to master today?`;
+        // Specific concept matching
+        if (clean.includes('array') || clean.includes('list')) {
+          botReply = `### 📦 What is an Array?\n\nAn **array** is a fundamental contiguous data structure that stores elements of the same data type in sequential memory locations.\n\n#### 🔑 Key Properties:\n* **$O(1)$ Constant Time Access**: You can access any element instantly via its index (e.g. \`arr[0]\`, \`arr[i]\`) because memory is contiguous: $\\text{Address} = \\text{Base} + i \\times \\text{ElementSize}$.\n* **$O(N)$ Insertion & Deletion**: Inserting or deleting elements at arbitrary positions requires shifting elements.\n* **$O(N)$ Search Time**: Linear scan unless the array is sorted (where Binary Search achieves $O(\\log N)$).\n\n\`\`\`python\n# Array (List) Operations in Python\nscores = [85, 92, 78, 96, 88]\n\n# 1. Constant-time index access O(1)\nfirst_score = scores[0]  # 85\n\n# 2. Append to end (Amortized O(1))\nscores.append(100)\n\n# 3. Iteration O(N)\nfor idx, score in enumerate(scores):\n    print(f"Student {idx + 1}: {score}")\n\`\`\``;
           followups = [
+            'Explain Array vs Linked List with memory tradeoffs',
+            'How does dynamic array resizing work in Python list?',
+            'Give me 2 practice problems on arrays'
+          ];
+        } else if (/^(hi|hello|hey|howdy|good morning|good evening|yo)\b/i.test(clean)) {
+          botReply = `👋 Hello **${firstName}**! Great to see you!\n\nI am your **StudyPath AI Tutor**. Here are a few things we can do together right now:\n* 🧠 **Master algorithms & data structures** (Arrays, Linked Lists, Trees, Graphs, DP)\n* 💻 **Write & debug clean code** in Python, JavaScript, SQL, or C++\n* 📅 **Build customized revision timetables** for your exams\n* 📝 **Generate rapid-fire diagnostic quiz questions**\n\nWhat subject or topic would you like to master today?`;
+          followups = [
+            'Explain what an Array is with Python code',
             'Explain QuickSort vs MergeSort with Python code',
-            'How do database indexes speed up SQL queries?',
-            'Create a 45-minute study plan for machine learning'
+            'How do database indexes speed up SQL queries?'
           ];
         } else if (clean.includes('quicksort') || clean.includes('mergesort') || clean.includes('sort')) {
           botReply = `### ⚡ QuickSort vs MergeSort Comparison\n\n| Algorithm | Best Time | Average Time | Worst Time | Space Complexity | In-Place? |\n|---|---|---|---|---|---|\n| **QuickSort** | $O(N \\log N)$ | $O(N \\log N)$ | $O(N^2)$ (poor pivot) | $O(\\log N)$ | ✅ Yes |\n| **MergeSort** | $O(N \\log N)$ | $O(N \\log N)$ | $O(N \\log N)$ | $O(N)$ auxiliary | ❌ No |\n\n#### 💡 When to use which?\n* **Use QuickSort** when cache locality is paramount and memory is tightly constrained.\n* **Use MergeSort** when guaranteed $O(N \\log N)$ worst-case performance is required or sorting linked lists.\n\n\`\`\`python\ndef quicksort(arr):\n    if len(arr) <= 1:\n        return arr\n    pivot = arr[len(arr) // 2]\n    left = [x for x in arr if x < pivot]\n    middle = [x for x in arr if x == pivot]\n    right = [x for x in arr if x > pivot]\n    return quicksort(left) + middle + quicksort(right)\n\`\`\``;
@@ -291,7 +393,7 @@ api.interceptors.response.use(
             'Add this schedule to my StudyPath weekly planner'
           ];
         } else {
-          botReply = `### 💡 StudyPath AI Tutor: **${msg || 'Learning Query'}**\n\nHello **${firstName}**! Here is a structured breakdown to master this concept:\n\n1. **Core Intuition**: Break the problem down into fundamental principles and identify edge cases.\n2. **Step-by-Step Approach**: Trace through small test inputs before writing full code.\n3. **Hands-On Application**: Implement the solution in a clean sandbox and verify time/space complexities.\n\n\`\`\`python\n# Example Implementation\ndef solve_problem(data):\n    \"\"\"Structured solution with clean time complexity.\"\"\"\n    processed = [x for x in data if x is not None]\n    return sorted(processed)\n\`\`\`\n\nWould you like a step-by-step code walkthrough or practice diagnostic questions?`;
+          botReply = `### 💡 StudyPath AI Tutor: **${msg || 'Learning Query'}**\n\nHello **${firstName}**! Here is a structured explanation to master this concept:\n\n1. **Fundamental Principle**: Break the problem down into core invariants and identify base cases.\n2. **Conceptual Trace**: Trace through small test inputs before writing full code.\n3. **Implementation**: Build a clean solution and analyze time/space complexities.\n\n\`\`\`python\n# Example Concept Demonstration\ndef example_solution(data):\n    \"\"\"Clean structured implementation with O(N) linear time.\"\"\"\n    return [item for item in data if item is not None]\n\`\`\`\n\nWhat specific part would you like to explore deeper?`;
           followups = [
             'Provide a step-by-step code walkthrough',
             'What are the most common edge cases to consider?',
@@ -307,7 +409,7 @@ api.interceptors.response.use(
             bot_reply: botReply,
             suggested_followups: followups,
             status: "success",
-            model: "studypath-companion",
+            model: "studypath-tutor",
             interaction_id: `chat_${Date.now()}`
           },
           status: 200,
@@ -339,10 +441,6 @@ api.interceptors.response.use(
           onboarding_completed: true,
         };
         return Promise.resolve({ data: fallbackToken, status: 200, statusText: 'OK' });
-      }
-
-      if (url.includes('/recommendations/refresh') || url.includes('/enroll') || url.includes('/save') || url.includes('/progress')) {
-        return Promise.resolve({ data: { success: true, message: 'Updated successfully' }, status: 200, statusText: 'OK' });
       }
     }
 

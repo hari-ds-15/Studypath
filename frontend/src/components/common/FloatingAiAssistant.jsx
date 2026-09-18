@@ -11,6 +11,7 @@ import {
   Check
 } from 'lucide-react';
 import api from '../../services/api';
+import { askGemini } from '../../services/geminiService';
 import ChatMessageContent from './ChatMessageContent';
 
 const FloatingAiAssistant = () => {
@@ -22,8 +23,8 @@ const FloatingAiAssistant = () => {
       text: '👋 Need instant help with a concept, code snippet, study plan, or resources? Ask me anything!',
       timestamp: 'Now',
       suggested_followups: [
+        'What is an array in data structures?',
         'Explain QuickSort vs MergeSort with Python code',
-        'How does Binary Search work in O(log N) time?',
         'Create a 45-minute study plan'
       ]
     }
@@ -72,15 +73,32 @@ const FloatingAiAssistant = () => {
     setLoading(true);
 
     try {
-      const res = await api.post('/chat', {
-        message: trimmed,
-        previous_interaction_id: previousInteractionId
-      });
-
-      const responseText = res.data?.response || res.data?.reply || res.data?.message || 'I have analyzed your request. What would you like to explore next?';
+      let responseText = '';
       let followups = [];
-      if (Array.isArray(res.data?.suggested_followups)) {
-        followups = res.data.suggested_followups.map(f => typeof f === 'string' ? f : (f?.prompt || f?.title || String(f)));
+      let interactionId = `gemini_${Date.now()}`;
+
+      // 1. Direct call to Google Gemini Flash API first!
+      try {
+        const savedUser = localStorage.getItem('studypath_user');
+        const userObj = savedUser ? JSON.parse(savedUser) : null;
+        const studentName = userObj?.full_name || 'Student';
+
+        const geminiRes = await askGemini(trimmed, studentName);
+        if (geminiRes && geminiRes.response) {
+          responseText = geminiRes.response;
+          followups = geminiRes.suggested_followups || [];
+        }
+      } catch (directGeminiErr) {
+        console.warn('Direct Gemini call fallback to API:', directGeminiErr);
+        const res = await api.post('/chat', {
+          message: trimmed,
+          previous_interaction_id: previousInteractionId
+        });
+        responseText = res.data?.response || res.data?.reply || res.data?.message || 'I have analyzed your request.';
+        followups = Array.isArray(res.data?.suggested_followups)
+          ? res.data.suggested_followups.map(f => typeof f === 'string' ? f : (f?.prompt || f?.title || String(f)))
+          : [];
+        interactionId = res.data?.interaction_id || interactionId;
       }
 
       const botMsg = {
@@ -91,8 +109,8 @@ const FloatingAiAssistant = () => {
         suggested_followups: followups
       };
 
-      if (res.data?.interaction_id && !res.data.interaction_id.startsWith('local_')) {
-        setPreviousInteractionId(res.data.interaction_id);
+      if (interactionId && !interactionId.startsWith('local_')) {
+        setPreviousInteractionId(interactionId);
       }
 
       setMessages((prev) => [...prev, botMsg]);
@@ -103,7 +121,7 @@ const FloatingAiAssistant = () => {
         sender: 'bot',
         text: "I'm experiencing a brief network delay. Please try asking again!",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        suggested_followups: ['Explain QuickSort vs MergeSort with Python code', 'Give me a study tip']
+        suggested_followups: ['What is an array in data structures?', 'Give me a study tip']
       };
       setMessages((prev) => [...prev, errMsg]);
     } finally {
@@ -160,7 +178,7 @@ const FloatingAiAssistant = () => {
                     StudyPath AI Tutor
                     <span className="px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[9px] font-bold border border-amber-200 dark:border-amber-500/30">Gemini AI</span>
                   </h3>
-                  <p className="text-[10px] text-stone-500 dark:text-stone-400">Always-ready study & coding companion</p>
+                  <p className="text-[10px] text-stone-500 dark:text-stone-400">Live Google Gemini 3.5 Flash Companion</p>
                 </div>
               </div>
 

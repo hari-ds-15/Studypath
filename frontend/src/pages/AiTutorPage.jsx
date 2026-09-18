@@ -15,6 +15,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import api from '../services/api';
+import { askGemini } from '../services/geminiService';
 import { useAuth } from '../context/AuthContext';
 import GlassCard from '../components/common/GlassCard';
 import Button from '../components/common/Button';
@@ -25,26 +26,26 @@ const DEFAULT_STARTERS = [
   {
     id: 'sug-1',
     category: 'DSA & Coding',
-    title: 'QuickSort vs MergeSort in Python',
-    prompt: 'Explain QuickSort vs MergeSort with Python code and time complexity'
+    title: 'What is an Array & List Data Structure',
+    prompt: 'Explain what an Array is with Python code examples, time complexity, and memory structure'
   },
   {
     id: 'sug-2',
+    category: 'DSA & Sorting',
+    title: 'QuickSort vs MergeSort in Python',
+    prompt: 'Explain QuickSort vs MergeSort with Python code and time complexity comparison'
+  },
+  {
+    id: 'sug-3',
     category: 'Databases & SQL',
     title: 'ACID Properties & SQL Aggregation',
     prompt: 'Explain ACID properties with real-world examples and SQL query'
   },
   {
-    id: 'sug-3',
+    id: 'sug-4',
     category: 'Machine Learning',
     title: 'Bias-Variance Tradeoff Intuitively',
     prompt: 'Explain the Bias-Variance tradeoff and how to fix overfitting'
-  },
-  {
-    id: 'sug-4',
-    category: 'Study Routine',
-    title: '45-Min Active Recall Protocol',
-    prompt: 'Create a 45-minute Pomodoro study block for high retention'
   }
 ];
 
@@ -65,7 +66,6 @@ const AiTutorPage = () => {
       try {
         const res = await api.get('/chat/suggestions');
         if (Array.isArray(res.data) && res.data.length > 0) {
-          // Flatten if suggestions are grouped by category
           const normalized = [];
           res.data.forEach((item, catIdx) => {
             if (item.prompts && Array.isArray(item.prompts)) {
@@ -103,12 +103,12 @@ const AiTutorPage = () => {
       {
         id: 'welcome-1',
         sender: 'bot',
-        text: `👋 Hello **${firstName}**! I am your **StudyPath AI Tutor & Academic Mentor**, powered by **Google Gemini AI**.\n\nI can help you:\n* 🧠 **Master algorithms & data structures** (QuickSort, Binary Search, Trees, Graphs)\n* 💻 **Write & debug clean code** in Python, SQL, JavaScript, or C++\n* 📅 **Build customized spaced-repetition study timetables** for exams\n* 📝 **Generate interactive diagnostic quiz questions**\n\nWhat subject or topic would you like to master today?`,
+        text: `👋 Hello **${firstName}**! I am your **StudyPath AI Tutor & Academic Mentor**, powered by **Google Gemini AI**.\n\nI can help you:\n* 🧠 **Master computer science concepts** (Arrays, Linked Lists, Trees, Graphs, DP)\n* 💻 **Write & debug clean code** in Python, SQL, JavaScript, or C++\n* 📅 **Build customized spaced-repetition study timetables** for exams\n* 📝 **Generate interactive diagnostic quiz questions**\n\nWhat subject or topic would you like to master today?`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         suggested_followups: [
+          'What is an array in data structures?',
           'Explain QuickSort vs MergeSort with Python code',
-          'How do database indexes speed up SQL queries?',
-          'Create a 45-minute study plan for machine learning'
+          'How do database indexes speed up SQL queries?'
         ]
       }
     ]);
@@ -147,15 +147,29 @@ const AiTutorPage = () => {
     setLoading(true);
 
     try {
-      const res = await api.post('/chat', {
-        message: trimmed,
-        previous_interaction_id: previousInteractionId
-      });
-
-      const responseText = res.data?.response || res.data?.reply || res.data?.message || 'I processed your request. How else can I help?';
+      let responseText = '';
       let followups = [];
-      if (Array.isArray(res.data?.suggested_followups)) {
-        followups = res.data.suggested_followups.map(f => typeof f === 'string' ? f : (f?.prompt || f?.title || String(f)));
+      let interactionId = `gemini_${Date.now()}`;
+
+      // 1. Direct Call to Google Gemini AI first for instant, accurate responses!
+      try {
+        const studentName = user?.full_name || 'Student';
+        const geminiRes = await askGemini(trimmed, studentName);
+        if (geminiRes && geminiRes.response) {
+          responseText = geminiRes.response;
+          followups = geminiRes.suggested_followups || [];
+        }
+      } catch (directGeminiErr) {
+        console.warn('Direct Gemini call fallback to API:', directGeminiErr);
+        const res = await api.post('/chat', {
+          message: trimmed,
+          previous_interaction_id: previousInteractionId
+        });
+        responseText = res.data?.response || res.data?.reply || res.data?.message || 'I processed your request.';
+        followups = Array.isArray(res.data?.suggested_followups)
+          ? res.data.suggested_followups.map(f => typeof f === 'string' ? f : (f?.prompt || f?.title || String(f)))
+          : [];
+        interactionId = res.data?.interaction_id || interactionId;
       }
 
       const botMsg = {
@@ -166,8 +180,8 @@ const AiTutorPage = () => {
         suggested_followups: followups
       };
 
-      if (res.data?.interaction_id && !res.data.interaction_id.startsWith('local_')) {
-        setPreviousInteractionId(res.data.interaction_id);
+      if (interactionId && !interactionId.startsWith('local_')) {
+        setPreviousInteractionId(interactionId);
       }
 
       setMessages((prev) => [...prev, botMsg]);
@@ -178,7 +192,7 @@ const AiTutorPage = () => {
         sender: 'bot',
         text: "⚠️ I encountered a brief network delay. Please try sending your question again.",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        suggested_followups: ['Explain QuickSort vs MergeSort with Python code', 'Create a 45-minute study plan']
+        suggested_followups: ['What is an array in data structures?', 'Explain QuickSort vs MergeSort']
       };
       setMessages((prev) => [...prev, errMsg]);
     } finally {
@@ -204,8 +218,8 @@ const AiTutorPage = () => {
         text: `🔄 Session refreshed! What new topic or problem shall we tackle, **${firstName}**?`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         suggested_followups: [
+          'What is an array in Python and C++?',
           'Explain QuickSort vs MergeSort with Python code',
-          'How does Binary Search work in O(log N) time?',
           'Create a 45-minute study plan for machine learning'
         ]
       }
@@ -236,7 +250,7 @@ const AiTutorPage = () => {
             </div>
             <p className="text-[11px] text-stone-500 dark:text-stone-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Real-time Active Recall, Coding & Academic Mentor</span>
+              <span>Live Google Gemini 3.5 Flash Active Recall & Coding Mentor</span>
             </p>
           </div>
         </div>
@@ -348,7 +362,7 @@ const AiTutorPage = () => {
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-              <span className="ml-1 font-medium text-amber-700 dark:text-amber-400">Gemini AI synthesizing response...</span>
+              <span className="ml-1 font-medium text-amber-700 dark:text-amber-400">Gemini AI synthesizing live response...</span>
             </div>
           </motion.div>
         )}
