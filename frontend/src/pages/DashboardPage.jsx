@@ -87,6 +87,25 @@ const TYPE_STYLES = {
   }
 };
 
+const DEFAULT_STUDY_HOURS = [
+  { day: 'Mon', hours: 3.2, target: 3.0 },
+  { day: 'Tue', hours: 2.8, target: 3.0 },
+  { day: 'Wed', hours: 4.1, target: 3.0 },
+  { day: 'Thu', hours: 2.5, target: 3.0 },
+  { day: 'Fri', hours: 3.8, target: 3.0 },
+  { day: 'Sat', hours: 4.5, target: 3.0 },
+  { day: 'Sun', hours: 3.0, target: 3.0 }
+];
+
+const DEFAULT_SUBJECT_MASTERY = [
+  { subject: 'Python & AI', score: 94, fullMark: 100 },
+  { subject: 'DSA', score: 78, fullMark: 100 },
+  { subject: 'SQL / DB', score: 85, fullMark: 100 },
+  { subject: 'Web Dev', score: 90, fullMark: 100 },
+  { subject: 'Cloud & DevOps', score: 75, fullMark: 100 },
+  { subject: 'System Design', score: 82, fullMark: 100 }
+];
+
 const DashboardPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -467,9 +486,9 @@ const DashboardPage = () => {
             </div>
           </div>
 
-          <div className="h-64 w-full pt-2">
+          <div className="h-64 w-full pt-2 min-h-[256px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={analytics?.study_hours_trend || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={analytics?.study_hours_trend && analytics.study_hours_trend.length > 0 ? analytics.study_hours_trend : DEFAULT_STUDY_HOURS} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
@@ -503,9 +522,9 @@ const DashboardPage = () => {
             </div>
           </div>
 
-          <div className="h-64 w-full flex items-center justify-center">
+          <div className="h-64 w-full flex items-center justify-center min-h-[256px]">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={analytics?.subject_mastery || []}>
+              <RadarChart data={analytics?.subject_mastery && analytics.subject_mastery.length > 0 ? analytics.subject_mastery : DEFAULT_SUBJECT_MASTERY}>
                 <PolarGrid stroke="rgba(148, 163, 184, 0.25)" />
                 <PolarAngleAxis dataKey="subject" stroke="#64748b" fontSize={10} />
                 <PolarRadiusAxis stroke="#94a3b8" fontSize={9} angle={30} domain={[0, 100]} />

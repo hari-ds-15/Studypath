@@ -352,20 +352,52 @@ export const FALLBACK_PROFILE = {
 export const FALLBACK_ANALYTICS = {
   total_study_hours: 28.5,
   weekly_study_hours: 14.5,
+  target_study_hours: 20.0,
   study_streak_days: 7,
   completion_rate: 76.0,
+  course_completion_rate: 76.0,
   average_quiz_score: 88.0,
+  quiz_average_score: 88.0,
   total_quizzes_taken: 12,
+  quizzes_taken_count: 12,
   learning_efficiency_score: 84.5,
   active_courses_count: 3,
+  enrolled_courses_count: 3,
+  completed_courses_count: 2,
+  study_hours_trend: [
+    { day: "Mon", hours: 3.2, target: 3.0 },
+    { day: "Tue", hours: 2.8, target: 3.0 },
+    { day: "Wed", hours: 4.1, target: 3.0 },
+    { day: "Thu", hours: 2.5, target: 3.0 },
+    { day: "Fri", hours: 3.8, target: 3.0 },
+    { day: "Sat", hours: 4.5, target: 3.0 },
+    { day: "Sun", hours: 3.0, target: 3.0 }
+  ],
+  quiz_score_trend: [
+    { date: "Sep 05", quiz: "Python Fundamentals", score: 85.0 },
+    { date: "Sep 08", quiz: "Control Flow & OOP", score: 90.0 },
+    { date: "Sep 11", quiz: "Linear Algebra & Stats", score: 78.0 },
+    { date: "Sep 14", quiz: "Data Structures & Time Comp", score: 80.0 },
+    { date: "Sep 17", quiz: "Machine Learning Foundations", score: 100.0 }
+  ],
+  subject_mastery: [
+    { subject: "Python & AI", score: 94, fullMark: 100 },
+    { subject: "DSA", score: 78, fullMark: 100 },
+    { subject: "SQL / DB", score: 85, fullMark: 100 },
+    { subject: "Web Dev", score: 90, fullMark: 100 },
+    { subject: "Cloud & DevOps", score: 75, fullMark: 100 },
+    { subject: "System Design", score: 82, fullMark: 100 }
+  ],
+  strong_subjects: ["Python & AI Engineering", "Database Systems (SQL)", "Full-Stack Web Dev"],
+  weak_subjects: ["Advanced Graph Algorithms", "Distributed Systems Sharding"],
   daily_breakdown: [
-    { day: "Mon", hours: 3.0 },
-    { day: "Tue", hours: 2.5 },
-    { day: "Wed", hours: 3.5 },
-    { day: "Thu", hours: 2.0 },
-    { day: "Fri", hours: 3.0 },
-    { day: "Sat", hours: 4.0 },
-    { day: "Sun", hours: 2.5 }
+    { day: "Mon", hours: 3.2 },
+    { day: "Tue", hours: 2.8 },
+    { day: "Wed", hours: 4.1 },
+    { day: "Thu", hours: 2.5 },
+    { day: "Fri", hours: 3.8 },
+    { day: "Sat", hours: 4.5 },
+    { day: "Sun", hours: 3.0 }
   ]
 };
 
