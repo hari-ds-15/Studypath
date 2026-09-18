@@ -47,33 +47,18 @@ export const signInWithEmail = async (email, password) => {
 };
 
 /**
- * Dispatch real SMS OTP via Supabase Phone Auth + Twilio Verify
- * @param {string} phone - E.164 formatted phone number (e.g. +14155552671)
+ * Sign in with Google / Gmail via Supabase OAuth
  */
-export const sendPhoneOtp = async (phone) => {
-  const cleanPhone = phone.trim().replace(/\s+/g, '');
-  const { data, error } = await supabase.auth.signInWithOtp({
-    phone: cleanPhone,
+export const signInWithGoogle = async () => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
     options: {
-      shouldCreateUser: true,
+      redirectTo: `${window.location.origin}/dashboard`,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
     },
-  });
-  if (error) throw error;
-  return data;
-};
-
-/**
- * Verify SMS OTP token sent via Twilio Verify
- * @param {string} phone - E.164 formatted phone number
- * @param {string} token - 6-digit verification code
- */
-export const verifyPhoneOtp = async (phone, token) => {
-  const cleanPhone = phone.trim().replace(/\s+/g, '');
-  const cleanToken = token.trim().replace(/\s+/g, '');
-  const { data, error } = await supabase.auth.verifyOtp({
-    phone: cleanPhone,
-    token: cleanToken,
-    type: 'sms',
   });
   if (error) throw error;
   return data;

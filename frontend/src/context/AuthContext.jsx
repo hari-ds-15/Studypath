@@ -3,8 +3,7 @@ import api from '../services/api';
 import supabase, {
   signUpWithEmail as sbSignUpWithEmail,
   signInWithEmail as sbSignInWithEmail,
-  sendPhoneOtp as sbSendPhoneOtp,
-  verifyPhoneOtp as sbVerifyPhoneOtp,
+  signInWithGoogle as sbSignInWithGoogle,
   signOutUser as sbSignOutUser,
   getActiveSession as sbGetActiveSession
 } from '../services/supabase';
@@ -97,7 +96,7 @@ export const AuthProvider = ({ children }) => {
 
     initAuth();
 
-    // Listen to Supabase Auth state changes
+    // Listen to Supabase Auth state changes (including OAuth redirects)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSupabaseSession(session);
       if (event === 'SIGNED_IN' && session?.user) {
@@ -137,7 +136,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * 2. Signup with Email + Password via Supabase Auth
+   * 2. Sign In with Google / Gmail via Supabase OAuth
+   */
+  const loginWithGoogle = async () => {
+    return await sbSignInWithGoogle();
+  };
+
+  /**
+   * 3. Signup with Email + Password via Supabase Auth
    */
   const registerWithEmail = async (formData) => {
     const { email, password, full_name, ...otherFields } = formData;
@@ -165,28 +171,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * 3. Send SMS OTP via Supabase + Twilio Verify
-   */
-  const sendPhoneOtp = async (phone) => {
-    const data = await sbSendPhoneOtp(phone);
-    return data;
-  };
-
-  /**
-   * 4. Verify SMS OTP via Supabase + Twilio Verify
-   */
-  const verifyPhoneOtp = async (phone, otpToken) => {
-    const data = await sbVerifyPhoneOtp(phone, otpToken);
-    if (data.session && data.user) {
-      setSupabaseSession(data.session);
-      const syncedUser = await syncWithBackend(data.user);
-      return syncedUser;
-    }
-    throw new Error('OTP Verification completed but no session was created. Please try again.');
-  };
-
-  /**
-   * 5. Logout User
+   * 4. Logout User
    */
   const logout = async () => {
     try {
@@ -218,10 +203,9 @@ export const AuthProvider = ({ children }) => {
         supabaseSession,
         login: loginWithEmail,
         loginWithEmail,
+        loginWithGoogle,
         register: registerWithEmail,
         registerWithEmail,
-        sendPhoneOtp,
-        verifyPhoneOtp,
         logout,
         updateUserProfile,
       }}

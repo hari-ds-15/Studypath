@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -9,47 +9,22 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
-  KeyRound,
-  Zap,
   Clock,
   Calendar as CalendarIcon,
   Search,
-  BookOpen,
   Eye,
   EyeOff,
-  Activity,
-  Phone,
-  ShieldCheck,
-  RotateCcw,
-  ChevronDown
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import BackgroundMesh from '../components/animations/BackgroundMesh';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
-
-// Popular Country Codes for international phone authentication
-const COUNTRY_CODES = [
-  { code: '+1', country: 'US / CA', flag: '🇺🇸' },
-  { code: '+91', country: 'India', flag: '🇮🇳' },
-  { code: '+44', country: 'UK', flag: '🇬🇧' },
-  { code: '+61', country: 'Australia', flag: '🇦🇺' },
-  { code: '+49', country: 'Germany', flag: '🇩🇪' },
-  { code: '+33', country: 'France', flag: '🇫🇷' },
-  { code: '+971', country: 'UAE', flag: '🇦🇪' },
-  { code: '+65', country: 'Singapore', flag: '🇸🇬' },
-  { code: '+81', country: 'Japan', flag: '🇯🇵' },
-  { code: '+86', country: 'China', flag: '🇨🇳' },
-  { code: '+55', country: 'Brazil', flag: '🇧🇷' },
-  { code: '+234', country: 'Nigeria', flag: '🇳🇬' },
-];
+import api from '../services/api';
 
 const LoginPage = () => {
-  const { loginWithEmail, sendPhoneOtp, verifyPhoneOtp } = useAuth();
+  const { loginWithEmail, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
-
-  // Auth Mode: 'email' or 'phone'
-  const [authMode, setAuthMode] = useState('email');
 
   // Email State
   const [email, setEmail] = useState('');
@@ -57,16 +32,9 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
-  // Phone OTP State
-  const [countryCode, setCountryCode] = useState('+1');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otpStep, setOtpStep] = useState('input_phone'); // 'input_phone' or 'verify_otp'
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [countdown, setCountdown] = useState(0);
-  const otpInputRefs = useRef([]);
-
   // UI Status
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [shake, setShake] = useState(false);
@@ -81,17 +49,6 @@ const LoginPage = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  // OTP Countdown Timer
-  useEffect(() => {
-    let interval = null;
-    if (countdown > 0) {
-      interval = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [countdown]);
 
   // Real-Time Dynamic 7-Day Calendar Strip
   const getRealTimeWeekDays = () => {
@@ -130,14 +87,30 @@ const LoginPage = () => {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
 
-  // 1. Email Login Submission
+  // 1. Google / Gmail One-Click Sign In
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+    } catch (err) {
+      console.error('Google Sign In error:', err);
+      const msg = err?.message || 'Google Sign In could not complete. You can also sign in with email and password below.';
+      setError(msg);
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      setGoogleLoading(false);
+    }
+  };
+
+  // 2. Email Login Submission
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
 
     if (!email.trim()) {
-      setError('Please enter your email.');
+      setError('Please enter your email address.');
       setShake(true);
       setTimeout(() => setShake(false), 500);
       return;
@@ -174,118 +147,8 @@ const LoginPage = () => {
     }
   };
 
-  // 2. Phone OTP: Send SMS
-  const handleSendOtp = async (e) => {
-    e?.preventDefault();
-    setError('');
-    setSuccessMsg('');
-
-    const cleanNumber = phoneNumber.trim().replace(/[^0-9]/g, '');
-    if (!cleanNumber || cleanNumber.length < 7) {
-      setError('Please enter a valid phone number (at least 7 to 15 digits).');
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-      return;
-    }
-
-    const fullPhoneNumber = `${countryCode}${cleanNumber}`;
-    setLoading(true);
-
-    try {
-      await sendPhoneOtp(fullPhoneNumber);
-      setOtpStep('verify_otp');
-      setCountdown(60);
-      setSuccessMsg(`SMS verification code dispatched to ${fullPhoneNumber} via Twilio Verify.`);
-      setOtpDigits(['', '', '', '', '', '']);
-      setTimeout(() => {
-        otpInputRefs.current[0]?.focus();
-      }, 100);
-    } catch (err) {
-      console.error('Send OTP error:', err);
-      const msg = err?.message || 'Failed to send SMS OTP. Please check the phone number format.';
-      setError(msg);
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 3. Phone OTP: Verify SMS Code
-  const handleVerifyOtp = async (e) => {
-    e?.preventDefault();
-    setError('');
-    setSuccessMsg('');
-
-    const otpCode = otpDigits.join('').trim();
-    if (otpCode.length !== 6) {
-      setError('Please enter the full 6-digit verification code.');
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-      return;
-    }
-
-    const cleanNumber = phoneNumber.trim().replace(/[^0-9]/g, '');
-    const fullPhoneNumber = `${countryCode}${cleanNumber}`;
-
-    setLoading(true);
-    try {
-      await verifyPhoneOtp(fullPhoneNumber, otpCode);
-      setIsSuccess(true);
-      setSuccessMsg('Phone verified successfully! Entering StudyPath...');
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 600);
-    } catch (err) {
-      console.error('Verify OTP error:', err);
-      const msg = err?.message || 'Invalid or expired OTP code. Please check and try again.';
-      setError(msg);
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle OTP digit box key events & auto-advance
-  const handleOtpDigitChange = (index, value) => {
-    if (/^[0-9]$/.test(value)) {
-      const newDigits = [...otpDigits];
-      newDigits[index] = value;
-      setOtpDigits(newDigits);
-      if (index < 5) {
-        otpInputRefs.current[index + 1]?.focus();
-      }
-    } else if (value === '') {
-      const newDigits = [...otpDigits];
-      newDigits[index] = '';
-      setOtpDigits(newDigits);
-    }
-  };
-
-  const handleOtpKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      otpInputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e) => {
-    e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').trim().replace(/[^0-9]/g, '').slice(0, 6);
-    if (pastedData) {
-      const newDigits = [...otpDigits];
-      for (let i = 0; i < 6; i++) {
-        newDigits[i] = pastedData[i] || '';
-      }
-      setOtpDigits(newDigits);
-      const nextFocus = Math.min(pastedData.length, 5);
-      otpInputRefs.current[nextFocus]?.focus();
-    }
-  };
-
   // Demo autofill helper
   const handleAutofillDemo = () => {
-    setAuthMode('email');
     setEmail('alex.chen@studypath.edu');
     setPassword('password123');
     setError('');
@@ -306,7 +169,7 @@ const LoginPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
           
           {/* ========================================================= */}
-          {/* LEFT COLUMN: SIGN IN FORM (EMAIL / PHONE OTP)             */}
+          {/* LEFT COLUMN: SIGN IN FORM (GOOGLE OAUTH & EMAIL LOGIN)    */}
           {/* ========================================================= */}
           <div className="lg:col-span-6 bg-gradient-to-b from-[#FFFDF9] via-[#FAF6ED] to-[#F5EFE0] rounded-[2rem] p-6 sm:p-8 flex flex-col justify-between border border-amber-200/70 shadow-xs">
             
@@ -322,7 +185,7 @@ const LoginPage = () => {
 
                 <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Supabase & Twilio Active</span>
+                  <span>Supabase Active</span>
                 </div>
               </div>
 
@@ -337,42 +200,51 @@ const LoginPage = () => {
               </div>
 
               {/* ========================================================= */}
-              {/* AUTH MODE TOGGLE TABS: [EMAIL LOGIN] / [PHONE OTP LOGIN] */}
+              {/* GOOGLE / GMAIL ONE-CLICK SIGN IN                          */}
               {/* ========================================================= */}
-              <div className="grid grid-cols-2 gap-1.5 p-1 bg-amber-100/70 rounded-2xl border border-amber-200/80 mb-5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode('email');
-                    setError('');
-                    setSuccessMsg('');
-                  }}
-                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
-                    authMode === 'email'
-                      ? 'bg-white text-stone-950 shadow-sm border border-amber-200'
-                      : 'text-stone-700 hover:text-stone-950 hover:bg-white/50'
-                  }`}
-                >
-                  <Mail className="w-4 h-4 text-amber-600" />
-                  <span>Email Login</span>
-                </button>
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading || loading}
+                className="w-full py-3 px-4 bg-white hover:bg-stone-50 border-2 border-amber-200 hover:border-amber-400 rounded-2xl font-black text-xs sm:text-sm text-stone-900 flex items-center justify-center gap-3 shadow-sm hover:shadow-md transition-all active:scale-[0.99] cursor-pointer"
+              >
+                {googleLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
+                    <span>Connecting to Google...</span>
+                  </div>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>Continue with Google / Gmail</span>
+                  </>
+                )}
+              </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode('phone');
-                    setError('');
-                    setSuccessMsg('');
-                  }}
-                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
-                    authMode === 'phone'
-                      ? 'bg-white text-stone-950 shadow-sm border border-amber-200'
-                      : 'text-stone-700 hover:text-stone-950 hover:bg-white/50'
-                  }`}
-                >
-                  <Phone className="w-4 h-4 text-amber-600" />
-                  <span>Phone OTP</span>
-                </button>
+              {/* Elegant Divider */}
+              <div className="relative flex items-center justify-center my-4.5">
+                <div className="border-t border-amber-200/90 w-full" />
+                <span className="bg-[#FAF6ED] px-3 text-[11px] font-bold text-stone-600 uppercase tracking-wider shrink-0">
+                  or sign in with email
+                </span>
+                <div className="border-t border-amber-200/90 w-full" />
               </div>
 
               {/* Error & Success Banners */}
@@ -403,273 +275,110 @@ const LoginPage = () => {
               </AnimatePresence>
 
               {/* ========================================================= */}
-              {/* MODE A: EMAIL + PASSWORD AUTH                             */}
+              {/* EMAIL + PASSWORD AUTH FORM                                */}
               {/* ========================================================= */}
-              {authMode === 'email' && (
-                <form onSubmit={handleEmailSubmit} className="space-y-4">
-                  {/* Quick Demo Autofill Pill */}
+              <form onSubmit={handleEmailSubmit} className="space-y-4">
+                {/* Quick Demo Autofill Pill */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-stone-900">Email Address</span>
+                  <button
+                    type="button"
+                    onClick={handleAutofillDemo}
+                    className="text-[11px] font-black text-amber-800 hover:text-amber-950 bg-amber-200/80 hover:bg-amber-300/80 px-2 py-0.5 rounded-full border border-amber-300 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-800 fill-current" />
+                    Quick Demo Autofill
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-700">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="yourname@gmail.com"
+                    className="w-full pl-10 pr-4 py-3 bg-white rounded-2xl border-2 border-amber-200/80 text-stone-950 font-bold text-sm placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-amber-500 focus:ring-3 focus:ring-amber-500/20 shadow-xs transition-all"
+                  />
+                </div>
+
+                <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-stone-900">Email</span>
+                    <span className="text-xs font-extrabold text-stone-900">Password</span>
                     <button
                       type="button"
-                      onClick={handleAutofillDemo}
-                      className="text-[11px] font-black text-amber-800 hover:text-amber-950 bg-amber-200/80 hover:bg-amber-300/80 px-2 py-0.5 rounded-full border border-amber-300 transition-colors flex items-center gap-1 cursor-pointer"
+                      onClick={() => setForgotModalOpen(true)}
+                      className="text-[11px] font-black text-amber-800 hover:text-amber-950 underline underline-offset-2 cursor-pointer"
                     >
-                      <Sparkles className="w-3 h-3 text-amber-800 fill-current" />
-                      Quick Demo Autofill
+                      Forgot password?
                     </button>
                   </div>
 
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-700">
-                      <Mail className="w-4 h-4" />
+                      <Lock className="w-4 h-4" />
                     </div>
                     <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="alex.chen@example.com"
-                      className="w-full pl-10 pr-4 py-3 bg-white rounded-2xl border-2 border-amber-200/80 text-stone-950 font-bold text-sm placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-amber-500 focus:ring-3 focus:ring-amber-500/20 shadow-xs transition-all"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-10 pr-11 py-3 bg-white rounded-2xl border-2 border-amber-200/80 text-stone-950 font-bold text-sm placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-amber-500 focus:ring-3 focus:ring-amber-500/20 shadow-xs transition-all"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-stone-700 hover:text-stone-950 cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-extrabold text-stone-900">Password</span>
-                      <button
-                        type="button"
-                        onClick={() => setForgotModalOpen(true)}
-                        className="text-[11px] font-black text-amber-800 hover:text-amber-950 underline underline-offset-2 cursor-pointer"
-                      >
-                        Forgot password?
-                      </button>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-700">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full pl-10 pr-11 py-3 bg-white rounded-2xl border-2 border-amber-200/80 text-stone-950 font-bold text-sm placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-amber-500 focus:ring-3 focus:ring-amber-500/20 shadow-xs transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-stone-700 hover:text-stone-950 cursor-pointer"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Remember Me */}
-                  <div className="flex items-center gap-2 pt-0.5">
-                    <input
-                      type="checkbox"
-                      id="rememberMe"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded border-amber-300 text-amber-500 focus:ring-amber-400 cursor-pointer"
-                    />
-                    <label htmlFor="rememberMe" className="text-xs font-bold text-stone-800 cursor-pointer">
-                      Keep me signed in on this device
-                    </label>
-                  </div>
-
-                  {/* Submit Button */}
-                  <button
-                    type="submit"
-                    disabled={loading || isSuccess}
-                    className={`w-full py-3.5 rounded-2xl font-black text-sm text-stone-950 flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
-                      isSuccess
-                        ? 'bg-emerald-400 shadow-emerald-400/20'
-                        : 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 shadow-amber-400/25 active:scale-[0.99]'
-                    }`}
-                  >
-                    {loading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
-                        <span>Verifying Supabase Session...</span>
-                      </div>
-                    ) : isSuccess ? (
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Welcome Back! Redirecting...</span>
-                      </div>
-                    ) : (
-                      <>
-                        <span>Sign In with Email</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
-
-              {/* ========================================================= */}
-              {/* MODE B: PHONE + OTP AUTH VIA SUPABASE & TWILIO VERIFY     */}
-              {/* ========================================================= */}
-              {authMode === 'phone' && (
-                <div>
-                  {otpStep === 'input_phone' ? (
-                    <form onSubmit={handleSendOtp} className="space-y-4">
-                      <div className="space-y-1">
-                        <label className="text-xs font-extrabold text-stone-900 block">
-                          Phone Number (International Format)
-                        </label>
-                        <p className="text-[11px] font-semibold text-stone-600">
-                          We will send a real 6-digit SMS verification code through Twilio Verify.
-                        </p>
-                      </div>
-
-                      {/* Country Code + Phone Input Group */}
-                      <div className="flex gap-2">
-                        {/* Country Code Select */}
-                        <div className="relative shrink-0 w-32">
-                          <select
-                            value={countryCode}
-                            onChange={(e) => setCountryCode(e.target.value)}
-                            className="w-full px-2.5 py-3 bg-white rounded-2xl border-2 border-amber-200/80 text-stone-950 font-black text-xs appearance-none focus:outline-none focus:border-amber-500 focus:ring-3 focus:ring-amber-500/20 shadow-xs cursor-pointer"
-                          >
-                            {COUNTRY_CODES.map((item) => (
-                              <option key={item.code} value={item.code}>
-                                {item.flag} {item.code} ({item.country})
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-600 pointer-events-none" />
-                        </div>
-
-                        {/* Number Input */}
-                        <div className="relative flex-1">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-stone-700">
-                            <Phone className="w-4 h-4" />
-                          </div>
-                          <input
-                            type="tel"
-                            value={phoneNumber}
-                            onChange={(e) => setPhoneNumber(e.target.value)}
-                            placeholder="415 555 2671"
-                            className="w-full pl-9 pr-3 py-3 bg-white rounded-2xl border-2 border-amber-200/80 text-stone-950 font-bold text-sm placeholder:text-stone-400 focus:outline-none focus:border-amber-500 focus:ring-3 focus:ring-amber-500/20 shadow-xs transition-all"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Send OTP CTA */}
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full py-3.5 rounded-2xl font-black text-sm text-stone-950 flex items-center justify-center gap-2 shadow-lg bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 shadow-amber-400/25 active:scale-[0.99] transition-all cursor-pointer"
-                      >
-                        {loading ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
-                            <span>Sending SMS via Twilio...</span>
-                          </div>
-                        ) : (
-                          <>
-                            <span>Send Verification Code</span>
-                            <ArrowRight className="w-4 h-4" />
-                          </>
-                        )}
-                      </button>
-                    </form>
-                  ) : (
-                    /* OTP VERIFICATION VIEW */
-                    <form onSubmit={handleVerifyOtp} className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <label className="text-xs font-extrabold text-stone-900 block">
-                            Enter 6-Digit OTP
-                          </label>
-                          <p className="text-[11px] font-bold text-amber-900">
-                            Sent to <span className="font-black text-stone-950">{countryCode} {phoneNumber}</span>
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOtpStep('input_phone');
-                            setError('');
-                          }}
-                          className="text-[11px] font-black text-amber-800 hover:text-amber-950 underline cursor-pointer"
-                        >
-                          Change Number
-                        </button>
-                      </div>
-
-                      {/* 6 Digit Input Boxes */}
-                      <div className="flex items-center justify-between gap-1.5" onPaste={handleOtpPaste}>
-                        {otpDigits.map((digit, idx) => (
-                          <input
-                            key={idx}
-                            ref={(el) => (otpInputRefs.current[idx] = el)}
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={1}
-                            value={digit}
-                            onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
-                            onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                            className="w-11 h-13 sm:w-12 sm:h-14 text-center bg-white rounded-xl border-2 border-amber-200/90 text-stone-950 font-black text-lg sm:text-xl focus:outline-none focus:border-amber-500 focus:ring-3 focus:ring-amber-500/20 shadow-xs transition-all"
-                          />
-                        ))}
-                      </div>
-
-                      {/* Resend Timer & Action */}
-                      <div className="flex items-center justify-between text-xs pt-1">
-                        {countdown > 0 ? (
-                          <span className="text-stone-600 font-bold flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-amber-700" />
-                            Resend code in <strong className="text-stone-950">{countdown}s</strong>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={handleSendOtp}
-                            disabled={loading}
-                            className="font-black text-amber-800 hover:text-amber-950 flex items-center gap-1 cursor-pointer underline"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            Resend OTP via Twilio
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Verify Button */}
-                      <button
-                        type="submit"
-                        disabled={loading || isSuccess}
-                        className={`w-full py-3.5 rounded-2xl font-black text-sm text-stone-950 flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
-                          isSuccess
-                            ? 'bg-emerald-400 shadow-emerald-400/20'
-                            : 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 shadow-amber-400/25 active:scale-[0.99]'
-                        }`}
-                      >
-                        {loading ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
-                            <span>Verifying with Twilio...</span>
-                          </div>
-                        ) : isSuccess ? (
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>Verified! Entering StudyPath...</span>
-                          </div>
-                        ) : (
-                          <>
-                            <ShieldCheck className="w-4 h-4" />
-                            <span>Verify OTP & Enter StudyPath</span>
-                          </>
-                        )}
-                      </button>
-                    </form>
-                  )}
                 </div>
-              )}
+
+                {/* Remember Me */}
+                <div className="flex items-center gap-2 pt-0.5">
+                  <input
+                    type="checkbox"
+                    id="rememberMe"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded border-amber-300 text-amber-500 focus:ring-amber-400 cursor-pointer"
+                  />
+                  <label htmlFor="rememberMe" className="text-xs font-bold text-stone-800 cursor-pointer">
+                    Keep me signed in on this device
+                  </label>
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={loading || isSuccess}
+                  className={`w-full py-3.5 rounded-2xl font-black text-sm text-stone-950 flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
+                    isSuccess
+                      ? 'bg-emerald-400 shadow-emerald-400/20'
+                      : 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 shadow-amber-400/25 active:scale-[0.99]'
+                  }`}
+                >
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
+                      <span>Verifying Supabase Session...</span>
+                    </div>
+                  ) : isSuccess ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Welcome Back! Redirecting...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <span>Sign In with Email</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
 
             {/* Bottom Footer: Signup Link */}
@@ -819,7 +528,7 @@ const LoginPage = () => {
             type="email"
             value={forgotEmail}
             onChange={(e) => setForgotEmail(e.target.value)}
-            placeholder="alex.chen@example.com"
+            placeholder="yourname@gmail.com"
             className="w-full px-3.5 py-2.5 bg-white rounded-xl border border-amber-200 text-stone-950 font-bold text-sm focus:outline-none focus:border-amber-500"
           />
 
