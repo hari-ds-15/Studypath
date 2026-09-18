@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Layouts & Pages
 import MainLayout from './layouts/MainLayout';
@@ -61,61 +62,63 @@ function App() {
   }, []);
 
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <NotificationProvider>
-          <BrowserRouter>
-            <Routes>
-              {/* Public Auth Routes */}
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <LoginPage />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/register"
-                element={
-                  <PublicRoute>
-                    <RegisterPage />
-                  </PublicRoute>
-                }
-              />
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <BrowserRouter>
+              <Routes>
+                {/* Public Auth Routes */}
+                <Route
+                  path="/login"
+                  element={
+                    <PublicRoute>
+                      <LoginPage />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/register"
+                  element={
+                    <PublicRoute>
+                      <RegisterPage />
+                    </PublicRoute>
+                  }
+                />
 
-              {/* Protected Workspace Routes */}
-              <Route
-                element={
-                  <ProtectedRoute>
-                    <MainLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/recommendations" element={<RecommendationsPage />} />
-                <Route path="/learning/:id" element={<CourseLearningPage />} />
-                <Route path="/my-learning" element={<MyLearningPage />} />
-                <Route path="/study-method" element={<StudyMethodPage />} />
-                <Route path="/study-plan" element={<StudyPlanPage />} />
-                <Route path="/electives" element={<ElectivesPage />} />
-                <Route path="/quizzes" element={<QuizListPage />} />
-                <Route path="/quiz/:id" element={<QuizPlayerPage />} />
-                <Route path="/analytics" element={<AnalyticsPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/notifications" element={<NotificationsPage />} />
-                <Route path="/ai-tutor" element={<AiTutorPage />} />
-              </Route>
+                {/* Protected Workspace Routes */}
+                <Route
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/recommendations" element={<RecommendationsPage />} />
+                  <Route path="/learning/:id" element={<CourseLearningPage />} />
+                  <Route path="/my-learning" element={<MyLearningPage />} />
+                  <Route path="/study-method" element={<StudyMethodPage />} />
+                  <Route path="/study-plan" element={<StudyPlanPage />} />
+                  <Route path="/electives" element={<ElectivesPage />} />
+                  <Route path="/quizzes" element={<QuizListPage />} />
+                  <Route path="/quiz/:id" element={<QuizPlayerPage />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/notifications" element={<NotificationsPage />} />
+                  <Route path="/ai-tutor" element={<AiTutorPage />} />
+                </Route>
 
-              {/* Catch-all route */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </BrowserRouter>
-        </NotificationProvider>
-      </AuthProvider>
-    </ThemeProvider>
+                {/* Catch-all route */}
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </NotificationProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

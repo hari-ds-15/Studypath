@@ -19,12 +19,12 @@ const FloatingAiAssistant = () => {
     {
       id: 'initial',
       sender: 'bot',
-      text: '👋 Need instant help with a concept, code bug, study plan, or resources? Ask me anything!',
+      text: '👋 Need instant help with a concept, code snippet, study plan, or resources? Ask me anything!',
       timestamp: 'Now',
       suggested_followups: [
-        'Top Python learning resources',
-        'Explain Dijkstra algorithm',
-        'Create a study plan'
+        'Explain QuickSort vs MergeSort with Python code',
+        'How does Binary Search work in O(log N) time?',
+        'Create a 45-minute study plan'
       ]
     }
   ]);
@@ -41,13 +41,23 @@ const FloatingAiAssistant = () => {
   }, [messages, isOpen, loading]);
 
   const copyMessageText = (text, idx) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     setCopiedIndex(idx);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
   const handleSendMessage = async (textToSend = inputMessage) => {
-    const trimmed = textToSend.trim();
+    let rawText = '';
+    if (typeof textToSend === 'string') {
+      rawText = textToSend;
+    } else if (textToSend && typeof textToSend === 'object') {
+      rawText = textToSend.prompt || textToSend.title || '';
+    } else {
+      rawText = inputMessage || '';
+    }
+
+    const trimmed = rawText.trim();
     if (!trimmed || loading) return;
 
     const userMsg = {
@@ -67,15 +77,21 @@ const FloatingAiAssistant = () => {
         previous_interaction_id: previousInteractionId
       });
 
+      const responseText = res.data?.response || res.data?.reply || res.data?.message || 'I have analyzed your request. What would you like to explore next?';
+      let followups = [];
+      if (Array.isArray(res.data?.suggested_followups)) {
+        followups = res.data.suggested_followups.map(f => typeof f === 'string' ? f : (f?.prompt || f?.title || String(f)));
+      }
+
       const botMsg = {
         id: `bot-${Date.now()}`,
         sender: 'bot',
-        text: res.data.response,
+        text: responseText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        suggested_followups: res.data.suggested_followups || []
+        suggested_followups: followups
       };
 
-      if (res.data.interaction_id && !res.data.interaction_id.startsWith('local_')) {
+      if (res.data?.interaction_id && !res.data.interaction_id.startsWith('local_')) {
         setPreviousInteractionId(res.data.interaction_id);
       }
 
@@ -85,8 +101,9 @@ const FloatingAiAssistant = () => {
       const errMsg = {
         id: `bot-err-${Date.now()}`,
         sender: 'bot',
-        text: "I'm experiencing a brief network hiccup. Please try asking again!",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        text: "I'm experiencing a brief network delay. Please try asking again!",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        suggested_followups: ['Explain QuickSort vs MergeSort with Python code', 'Give me a study tip']
       };
       setMessages((prev) => [...prev, errMsg]);
     } finally {
@@ -111,14 +128,14 @@ const FloatingAiAssistant = () => {
           whileHover={{ scale: 1.06 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2.5 px-4 py-3 rounded-full bg-[#FACC15] hover:bg-[#EAB308] text-stone-950 font-bold text-xs shadow-2xl shadow-amber-500/30 border border-amber-300 group transition-all cursor-pointer"
+          className="flex items-center gap-2.5 px-4 py-3 rounded-full bg-[#FACC15] hover:bg-[#EAB308] text-stone-950 font-bold text-xs shadow-2xl shadow-amber-500/30 border border-amber-300 group transition-all cursor-pointer select-none"
         >
           <div className="relative">
             <Bot className="w-5 h-5 text-stone-950 animate-pulse" />
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#FACC15]" />
           </div>
           <span className="tracking-tight hidden sm:inline font-bold">Ask AI Tutor</span>
-          <Sparkles className="w-3.5 h-3.5 text-stone-850 group-hover:rotate-12 transition-transform" />
+          <Sparkles className="w-3.5 h-3.5 text-stone-900 group-hover:rotate-12 transition-transform" />
         </motion.button>
       )}
 
@@ -208,17 +225,20 @@ const FloatingAiAssistant = () => {
                     {/* Follow-up suggestion pills */}
                     {!isUser && msg.suggested_followups && msg.suggested_followups.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2 select-none">
-                        {msg.suggested_followups.map((sug, sIdx) => (
-                          <button
-                            key={sIdx}
-                            type="button"
-                            onClick={() => handleSendMessage(sug)}
-                            className="text-[10px] font-medium px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-all text-left flex items-center gap-1 shadow-xs cursor-pointer"
-                          >
-                            <Sparkles className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                            <span>{sug}</span>
-                          </button>
-                        ))}
+                        {msg.suggested_followups.map((sug, sIdx) => {
+                          const label = typeof sug === 'string' ? sug : (sug?.prompt || sug?.title || 'Explore topic');
+                          return (
+                            <button
+                              key={sIdx}
+                              type="button"
+                              onClick={() => handleSendMessage(label)}
+                              className="text-[10px] font-medium px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-all text-left flex items-center gap-1 shadow-xs cursor-pointer"
+                            >
+                              <Sparkles className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span>{label}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

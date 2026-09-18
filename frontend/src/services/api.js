@@ -230,6 +230,9 @@ api.interceptors.response.use(
         return Promise.resolve({
           data: {
             response: botReply,
+            reply: botReply,
+            message: botReply,
+            bot_reply: botReply,
             suggested_followups: followups,
             status: "success",
             model: "gemini-flash-interactive",
