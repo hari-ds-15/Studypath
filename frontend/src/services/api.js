@@ -7,6 +7,16 @@ import {
   FALLBACK_QUIZZES
 } from './mockData';
 import { askGemini } from './geminiService';
+import {
+  getStoredProfile,
+  saveStoredProfile,
+  generateAiStudyPlan,
+  computeWeeklyPlan,
+  toggleSessionCompleted,
+  addStudySession,
+  updateStudySession,
+  deleteStudySession
+} from './studyPlanEngine';
 
 // Dynamically compute API base URL so mobile phones & cross-device laptops on LAN connect to the host backend
 const getApiBaseUrl = () => {
@@ -49,6 +59,7 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const url = originalRequest?.url || '';
+    const method = (originalRequest?.method || 'get').toLowerCase();
 
     // Handle 401 unauthorized
     if (error.response && error.response.status === 401) {
@@ -62,8 +73,9 @@ api.interceptors.response.use(
 
     // If backend is unreachable (e.g. on Vercel deployment or mobile without local python backend), provide seamless fallback
     if (!error.response || error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
-      console.info(`[StudyPath Standalone/Vercel Mode] Serving fallback data for: ${url}`);
+      console.info(`[StudyPath Standalone/Vercel Mode] Serving fallback data for: [${method.toUpperCase()}] ${url}`);
 
+      // 1. Courses & Recommendations
       if (url.includes('/recommendations/courses') || url.includes('/courses')) {
         if (url.match(/\/courses\/\d+$/)) {
           const id = parseInt(url.split('/').pop(), 10);
@@ -73,25 +85,85 @@ api.interceptors.response.use(
         return Promise.resolve({ data: FALLBACK_COURSES, status: 200, statusText: 'OK' });
       }
 
+      // 2. Student Profile (Persistent in localStorage)
       if (url.includes('/student/profile') || url.includes('/auth/me')) {
-        const savedUser = localStorage.getItem('studypath_user');
-        const userData = savedUser ? JSON.parse(savedUser) : null;
-        const profile = {
-          ...FALLBACK_PROFILE,
-          full_name: userData?.full_name || 'StudyPath Student',
-          email: userData?.email || 'student@studypath.edu',
-        };
+        if (method === 'put' || method === 'post' || method === 'patch') {
+          let reqData = {};
+          try {
+            reqData = typeof originalRequest.data === 'string' ? JSON.parse(originalRequest.data) : (originalRequest.data || {});
+          } catch {
+            reqData = {};
+          }
+          const savedProfile = saveStoredProfile(reqData);
+          // Automatically recalculate & update the AI study plan with the new profile parameters!
+          generateAiStudyPlan(savedProfile);
+          return Promise.resolve({ data: savedProfile, status: 200, statusText: 'OK' });
+        }
+
+        const profile = getStoredProfile();
         return Promise.resolve({ data: profile, status: 200, statusText: 'OK' });
       }
 
+      // 3. Analytics
       if (url.includes('/analytics')) {
         return Promise.resolve({ data: FALLBACK_ANALYTICS, status: 200, statusText: 'OK' });
       }
 
+      // 4. Study Plan (Dynamic AI generation, toggle, add, update, delete)
       if (url.includes('/study-plan')) {
-        return Promise.resolve({ data: FALLBACK_STUDY_PLAN, status: 200, statusText: 'OK' });
+        // Auto-generate AI study plan
+        if (url.includes('/study-plan/generate')) {
+          const newPlan = generateAiStudyPlan();
+          return Promise.resolve({ data: newPlan, status: 200, statusText: 'OK' });
+        }
+
+        // Toggle completed session
+        if (url.includes('/toggle-complete')) {
+          const parts = url.split('/');
+          const toggleIndex = parts.indexOf('toggle-complete');
+          const id = parseInt(parts[toggleIndex - 1], 10);
+          const res = toggleSessionCompleted(id);
+          return Promise.resolve({ data: res, status: 200, statusText: 'OK' });
+        }
+
+        // Delete session
+        if (method === 'delete') {
+          const id = parseInt(url.split('/').pop(), 10);
+          const res = deleteStudySession(id);
+          return Promise.resolve({ data: res, status: 200, statusText: 'OK' });
+        }
+
+        // Update session
+        if (method === 'put') {
+          const id = parseInt(url.split('/').pop(), 10);
+          let reqData = {};
+          try {
+            reqData = typeof originalRequest.data === 'string' ? JSON.parse(originalRequest.data) : (originalRequest.data || {});
+          } catch {
+            reqData = {};
+          }
+          const res = updateStudySession(id, reqData);
+          return Promise.resolve({ data: res, status: 200, statusText: 'OK' });
+        }
+
+        // Add new session
+        if (method === 'post') {
+          let reqData = {};
+          try {
+            reqData = typeof originalRequest.data === 'string' ? JSON.parse(originalRequest.data) : (originalRequest.data || {});
+          } catch {
+            reqData = {};
+          }
+          const res = addStudySession(reqData);
+          return Promise.resolve({ data: res, status: 200, statusText: 'OK' });
+        }
+
+        // Get weekly plan
+        const plan = computeWeeklyPlan();
+        return Promise.resolve({ data: plan, status: 200, statusText: 'OK' });
       }
 
+      // 5. Quizzes
       if (url.includes('/quizzes')) {
         if (url.match(/\/quizzes\/\d+$/)) {
           const id = parseInt(url.split('/').pop(), 10);
@@ -101,7 +173,7 @@ api.interceptors.response.use(
         return Promise.resolve({ data: FALLBACK_QUIZZES, status: 200, statusText: 'OK' });
       }
 
-      // Intelligent AI Chatbot Engine for StudyPath (Standalone & Vercel)
+      // 6. Intelligent AI Chatbot Engine for StudyPath (Standalone & Vercel)
       if (url.includes('/chat/suggestions')) {
         return Promise.resolve({
           data: [
