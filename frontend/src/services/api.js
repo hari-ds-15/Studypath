@@ -1,11 +1,6 @@
 import axios from 'axios';
 import {
-  FALLBACK_COURSES,
-  FALLBACK_ELECTIVES,
-  FALLBACK_PROFILE,
   FALLBACK_ANALYTICS,
-  FALLBACK_QUIZZES,
-  FALLBACK_QUIZ_HISTORY,
   FALLBACK_NOTIFICATIONS,
   FALLBACK_STUDY_METHOD
 } from './mockData';
@@ -20,6 +15,19 @@ import {
   updateStudySession,
   deleteStudySession
 } from './studyPlanEngine';
+import {
+  ALL_COURSES,
+  getPersonalizedRecommendations,
+  getPersonalizedElectives
+} from './courseCatalogEngine';
+import {
+  CAREER_ROADMAPS
+} from '../data/careerRoadmapsData';
+import {
+  generateDynamicQuiz,
+  recordQuizSubmission,
+  getStoredQuizHistory
+} from './dynamicQuizEngine';
 
 // Determine if we should run in fast standalone client mode
 export const isStandaloneMode = () => {
@@ -46,45 +54,20 @@ const getApiBaseUrl = () => {
 };
 
 // Course state helpers for persistent enrollments and bookmarks
-const getStoredCourses = () => {
+const getSavedCourseIds = () => {
   try {
-    const saved = localStorage.getItem('studypath_courses');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {
-    console.warn('Failed to parse stored courses:', e);
-  }
-  return FALLBACK_COURSES;
-};
-
-const saveStoredCourses = (courses) => {
-  try {
-    localStorage.setItem('studypath_courses', JSON.stringify(courses));
-  } catch (e) {
-    console.warn('Failed to save courses:', e);
+    const saved = localStorage.getItem('studypath_saved_courses');
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
   }
 };
 
-const getStoredElectives = () => {
+const saveSavedCourseIds = (ids) => {
   try {
-    const saved = localStorage.getItem('studypath_electives');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
+    localStorage.setItem('studypath_saved_courses', JSON.stringify(ids));
   } catch (e) {
-    console.warn('Failed to parse stored electives:', e);
-  }
-  return FALLBACK_ELECTIVES;
-};
-
-const saveStoredElectives = (electives) => {
-  try {
-    localStorage.setItem('studypath_electives', JSON.stringify(electives));
-  } catch (e) {
-    console.warn('Failed to save electives:', e);
+    console.warn('Failed to save bookmarks:', e);
   }
 };
 
@@ -109,7 +92,7 @@ const saveStoredNotifications = (notifs) => {
   }
 };
 
-// Comprehensive local router that handles all 34 API endpoints instantly
+// Comprehensive local router that handles all API endpoints instantly
 export const handleLocalRoute = async (config) => {
   const url = config.url || '';
   const method = (config.method || 'get').toLowerCase();
@@ -121,15 +104,25 @@ export const handleLocalRoute = async (config) => {
     reqData = {};
   }
 
+  const profile = getStoredProfile();
+  const savedIds = getSavedCourseIds();
+
   // 1. Electives Recommendations
   if (url.includes('/recommendations/electives')) {
-    const electives = getStoredElectives();
+    const electives = getPersonalizedElectives(profile).map(el => ({
+      ...el,
+      is_saved: savedIds.includes(el.course_id)
+    }));
     return { data: electives, status: 200, statusText: 'OK', headers: {}, config };
   }
 
-  // 2. Study Method Recommendation
+  // 2. Career Stream Roadmaps
+  if (url.includes('/recommendations/roadmaps')) {
+    return { data: CAREER_ROADMAPS, status: 200, statusText: 'OK', headers: {}, config };
+  }
+
+  // 3. Study Method Recommendation
   if (url.includes('/recommendations/study-method')) {
-    const profile = getStoredProfile();
     const customMethod = {
       ...FALLBACK_STUDY_METHOD,
       preferred_content_type: profile.preferred_content_type || 'Interactive & Practice',
@@ -139,14 +132,17 @@ export const handleLocalRoute = async (config) => {
     return { data: customMethod, status: 200, statusText: 'OK', headers: {}, config };
   }
 
-  // 3. Courses Recommendations & Details
+  // 4. Courses Recommendations & Details
   if (url.includes('/recommendations/courses') || url.includes('/courses')) {
-    const courses = getStoredCourses();
+    const recs = getPersonalizedRecommendations(profile).map(c => ({
+      ...c,
+      is_saved: savedIds.includes(c.course_id)
+    }));
 
     // Saved list
     if (url.includes('/courses/saved/list')) {
-      const saved = courses.filter((c) => c.is_saved);
-      return { data: saved.length > 0 ? saved : [courses[1]], status: 200, statusText: 'OK', headers: {}, config };
+      const saved = recs.filter((c) => c.is_saved);
+      return { data: saved.length > 0 ? saved : [recs[0]], status: 200, statusText: 'OK', headers: {}, config };
     }
 
     // Toggle Save / Bookmark
@@ -154,76 +150,37 @@ export const handleLocalRoute = async (config) => {
       const parts = url.split('/');
       const saveIdx = parts.indexOf('save');
       const courseId = parseInt(parts[saveIdx - 1], 10);
-      let isSaved = true;
-
-      // Update courses
-      const updatedCourses = courses.map((c) => {
-        if (c.course_id === courseId || c.id === courseId) {
-          isSaved = !c.is_saved;
-          return { ...c, is_saved: isSaved };
-        }
-        return c;
-      });
-      saveStoredCourses(updatedCourses);
-
-      // Also update electives if present
-      const electives = getStoredElectives();
-      const updatedElectives = electives.map((e) => {
-        if (e.course_id === courseId || e.id === courseId) {
-          return { ...e, is_saved: isSaved };
-        }
-        return e;
-      });
-      saveStoredElectives(updatedElectives);
+      
+      let newSavedIds = [...savedIds];
+      let isSaved = false;
+      if (newSavedIds.includes(courseId)) {
+        newSavedIds = newSavedIds.filter(id => id !== courseId);
+        isSaved = false;
+      } else {
+        newSavedIds.push(courseId);
+        isSaved = true;
+      }
+      saveSavedCourseIds(newSavedIds);
 
       return { data: { saved: isSaved, message: isSaved ? 'Bookmarked' : 'Bookmark removed' }, status: 200, statusText: 'OK', headers: {}, config };
     }
 
     // Toggle Enroll
     if (url.includes('/enroll')) {
-      const parts = url.split('/');
-      const enrollIdx = parts.indexOf('enroll');
-      const courseId = parseInt(parts[enrollIdx - 1], 10);
-
-      const updatedCourses = courses.map((c) => {
-        if (c.course_id === courseId || c.id === courseId) {
-          return { ...c, is_enrolled: true };
-        }
-        return c;
-      });
-      saveStoredCourses(updatedCourses);
-
       return { data: { enrolled: true, message: 'Enrolled successfully' }, status: 200, statusText: 'OK', headers: {}, config };
     }
 
     // Update Progress
     if (url.includes('/progress')) {
-      const parts = url.split('/');
-      const progIdx = parts.indexOf('progress');
-      const courseId = parseInt(parts[progIdx - 1], 10);
-
-      const updatedCourses = courses.map((c) => {
-        if (c.course_id === courseId || c.id === courseId) {
-          return {
-            ...c,
-            progress: reqData.progress ?? c.progress,
-            current_module_index: reqData.current_module_index ?? c.current_module_index,
-            current_lesson_index: reqData.current_lesson_index ?? c.current_lesson_index
-          };
-        }
-        return c;
-      });
-      saveStoredCourses(updatedCourses);
-
       return { data: { success: true, progress: reqData.progress }, status: 200, statusText: 'OK', headers: {}, config };
     }
 
     // Single course detail
     if (url.match(/\/courses\/\d+$/)) {
       const id = parseInt(url.split('/').pop(), 10);
-      const course = courses.find((c) => c.course_id === id || c.id === id) ||
-        getStoredElectives().find((c) => c.course_id === id || c.id === id) ||
-        courses[0];
+      const course = ALL_COURSES.find((c) => c.course_id === id || c.id === id) ||
+        recs.find((c) => c.course_id === id) ||
+        ALL_COURSES[0];
       return { data: course, status: 200, statusText: 'OK', headers: {}, config };
     }
 
@@ -232,17 +189,16 @@ export const handleLocalRoute = async (config) => {
       return { data: { success: true, message: 'Recommendation models recalibrated' }, status: 200, statusText: 'OK', headers: {}, config };
     }
 
-    return { data: courses, status: 200, statusText: 'OK', headers: {}, config };
+    return { data: recs, status: 200, statusText: 'OK', headers: {}, config };
   }
 
-  // 4. Student Profile & Settings (Persistent)
+  // 5. Student Profile & Settings (Persistent)
   if (url.includes('/student/profile') || url.includes('/auth/me')) {
     if (method === 'put' || method === 'post' || method === 'patch') {
       const savedProfile = saveStoredProfile(reqData);
       generateAiStudyPlan(savedProfile);
       return { data: savedProfile, status: 200, statusText: 'OK', headers: {}, config };
     }
-    const profile = getStoredProfile();
     return { data: profile, status: 200, statusText: 'OK', headers: {}, config };
   }
 
@@ -256,24 +212,26 @@ export const handleLocalRoute = async (config) => {
     const reset = saveStoredProfile({
       education_level: "Undergraduate",
       branch_major: "Computer Science & Engineering",
+      selected_language: "Python",
+      skill_level: "Beginner",
+      career_stream: "AI Engineer",
       learning_speed: "Balanced",
       preferred_content_type: "Interactive & Video",
-      average_study_hours: 3.5,
-      weekly_target_hours: 20,
+      daily_study_hours: 3.0,
+      weekly_target_hours: 21,
       strong_subjects: ["Python Programming"],
       weak_subjects: ["Data Structures & Algorithms"],
       career_interests: ["AI Engineer"],
-      onboarding_completed: false
+      onboarding_completed: true
     });
     return { data: reset, status: 200, statusText: 'OK', headers: {}, config };
   }
 
-  // 5. Analytics
+  // 6. Analytics
   if (url.includes('/analytics')) {
-    const profile = getStoredProfile();
     const analyticsData = {
       ...FALLBACK_ANALYTICS,
-      target_study_hours: profile.weekly_target_hours || 20.0,
+      target_study_hours: profile.weekly_target_hours || 21.0,
       learning_efficiency_score: profile.learning_efficiency_score || 84.5,
       strong_subjects: profile.strong_subjects?.length ? profile.strong_subjects : FALLBACK_ANALYTICS.strong_subjects,
       weak_subjects: profile.weak_subjects?.length ? profile.weak_subjects : FALLBACK_ANALYTICS.weak_subjects,
@@ -281,7 +239,7 @@ export const handleLocalRoute = async (config) => {
     return { data: analyticsData, status: 200, statusText: 'OK', headers: {}, config };
   }
 
-  // 6. Study Plan (Dynamic AI Generation & CRUD)
+  // 7. Study Plan (Dynamic AI Generation & CRUD)
   if (url.includes('/study-plan')) {
     if (url.includes('/study-plan/generate')) {
       const newPlan = generateAiStudyPlan();
@@ -317,84 +275,170 @@ export const handleLocalRoute = async (config) => {
     return { data: plan, status: 200, statusText: 'OK', headers: {}, config };
   }
 
-  // 7. Diagnostic Quizzes & Submissions
+  // 8. Knowledge Testing / Quizzes & Dynamic Gemini Generator
   if (url.includes('/quizzes')) {
-    // Quiz History
-    if (url.includes('/quizzes/history/list')) {
-      let historyList = [];
+    // Generate Dynamic Quiz via Gemini or Bank
+    if (url.includes('/generate-dynamic')) {
+      const dynamicQuiz = await generateDynamicQuiz({
+        language: reqData.language || profile.selected_language || 'Python',
+        level: reqData.level || profile.skill_level || 'Beginner',
+        topic: reqData.topic || '',
+        numQuestions: reqData.num_questions || 5
+      });
+      // Store in memory cache for submission retrieval
       try {
-        const savedHist = localStorage.getItem('studypath_quiz_history');
-        historyList = savedHist ? JSON.parse(savedHist) : FALLBACK_QUIZ_HISTORY;
-      } catch {
-        historyList = FALLBACK_QUIZ_HISTORY;
+        const storedList = localStorage.getItem('studypath_cached_quizzes');
+        const list = storedList ? JSON.parse(storedList) : [];
+        list.push(dynamicQuiz);
+        localStorage.setItem('studypath_cached_quizzes', JSON.stringify(list.slice(-10)));
+      } catch (e) {
+        console.warn('Failed to cache dynamic quiz:', e);
       }
+      return { data: dynamicQuiz, status: 200, statusText: 'OK', headers: {}, config };
+    }
+
+    // Quiz History with defensive timestamps
+    if (url.includes('/quizzes/history/list')) {
+      const historyList = getStoredQuizHistory();
       return { data: historyList, status: 200, statusText: 'OK', headers: {}, config };
     }
 
-    // Quiz Submit
+    // Quiz Submit & Recalibrate
     if (url.includes('/submit')) {
       const quizId = parseInt(url.split('/')[2] || url.split('/').slice(-2)[0], 10);
-      const targetQuiz = FALLBACK_QUIZZES.find((q) => q.id === quizId) || FALLBACK_QUIZZES[0];
+      let targetQuiz = null;
+      try {
+        const cached = localStorage.getItem('studypath_cached_quizzes');
+        if (cached) {
+          const list = JSON.parse(cached);
+          targetQuiz = list.find(q => q.id === quizId);
+        }
+      } catch (e) {
+        console.warn('Failed to read cached quiz:', e);
+      }
+
+      if (!targetQuiz) {
+        // Fallback to offline generator
+        targetQuiz = await generateDynamicQuiz({
+          language: profile.selected_language || 'Python',
+          level: profile.skill_level || 'Beginner'
+        });
+      }
+
       const userAnswers = reqData.answers || [];
       let correct = 0;
+      const reviewList = [];
 
       targetQuiz.questions.forEach((q) => {
         const given = userAnswers.find((a) => a.question_id === q.id);
-        if (given && given.selected_option_index === q.correct_index) {
-          correct++;
-        }
+        const selectedIdx = given ? given.selected_option_index : -1;
+        const isCorrect = selectedIdx === q.correct_index;
+        if (isCorrect) correct++;
+
+        reviewList.push({
+          id: q.id,
+          question_text: q.question_text,
+          options: q.options,
+          selected_option_index: selectedIdx,
+          correct_option_index: q.correct_index,
+          is_correct: isCorrect,
+          explanation: q.explanation
+        });
       });
 
-      const total = targetQuiz.questions.length;
+      const total = Math.max(1, targetQuiz.questions.length);
       const score = Math.round((correct / total) * 100);
       const passed = score >= (targetQuiz.passing_score || 70);
 
-      const resultData = {
-        quiz_id: quizId,
-        score_percentage: score,
+      const submissionResult = recordQuizSubmission({
+        quizId: quizId,
+        quizTitle: targetQuiz.title,
+        language: targetQuiz.language || profile.selected_language || 'Python',
+        scorePercentage: score,
         passed: passed,
-        total_questions: total,
-        correct_count: correct,
-        wrong_count: total - correct,
-        time_spent_seconds: reqData.time_spent_seconds || 180,
-        feedback: passed
-          ? "Outstanding work! You demonstrated strong conceptual understanding."
-          : "Good effort! Review the question explanations to strengthen your knowledge."
+        totalQuestions: total,
+        correctCount: correct,
+        timeSpentSeconds: reqData.time_spent_seconds || 180,
+        answers: userAnswers
+      });
+
+      return {
+        data: {
+          ...submissionResult,
+          review: reviewList
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config
       };
-
-      try {
-        const savedHist = localStorage.getItem('studypath_quiz_history');
-        const list = savedHist ? JSON.parse(savedHist) : [...FALLBACK_QUIZ_HISTORY];
-        list.unshift({
-          id: Date.now(),
-          quiz_id: quizId,
-          quiz_title: targetQuiz.title,
-          score_percentage: score,
-          passed: passed,
-          total_questions: total,
-          correct_count: correct,
-          time_spent_seconds: reqData.time_spent_seconds || 180,
-          created_at: new Date().toISOString()
-        });
-        localStorage.setItem('studypath_quiz_history', JSON.stringify(list));
-      } catch (e) {
-        console.error('Failed to save quiz attempt history:', e);
-      }
-
-      return { data: resultData, status: 200, statusText: 'OK', headers: {}, config };
     }
 
     // Single Quiz Detail
     if (url.match(/\/quizzes\/\d+$/)) {
       const id = parseInt(url.split('/').pop(), 10);
-      const quiz = FALLBACK_QUIZZES.find((q) => q.id === id) || FALLBACK_QUIZZES[0];
-      return { data: quiz, status: 200, statusText: 'OK', headers: {}, config };
+      let targetQuiz = null;
+      try {
+        const cached = localStorage.getItem('studypath_cached_quizzes');
+        if (cached) {
+          const list = JSON.parse(cached);
+          targetQuiz = list.find(q => q.id === id);
+        }
+      } catch (e) {
+        console.warn('Failed to load cached quiz:', e);
+      }
+
+      if (!targetQuiz) {
+        targetQuiz = await generateDynamicQuiz({
+          language: profile.selected_language || 'Python',
+          level: profile.skill_level || 'Beginner'
+        });
+      }
+
+      return { data: targetQuiz, status: 200, statusText: 'OK', headers: {}, config };
     }
 
-    return { data: FALLBACK_QUIZZES, status: 200, statusText: 'OK', headers: {}, config };
+    // Default list of initial quiz tracks
+    const initialQuizzes = [
+      {
+        id: 1,
+        title: `${profile.selected_language || 'Python'} Diagnostic Assessment`,
+        language: profile.selected_language || 'Python',
+        level: profile.skill_level || 'Beginner',
+        description: `Comprehensive diagnostic assessment for ${profile.selected_language || 'Python'} fundamentals.`,
+        course_title: `${profile.selected_language || 'Python'} Foundations`,
+        time_limit_minutes: 10,
+        passing_score: 70,
+        total_questions: 5
+      },
+      {
+        id: 2,
+        title: "Data Structures & Algorithms Checkpoint",
+        language: "Core Computer Science (DSA)",
+        level: "Intermediate",
+        description: "Test your understanding of algorithmic complexity, trees, and graphs.",
+        course_title: "Core CS Track",
+        time_limit_minutes: 12,
+        passing_score: 70,
+        total_questions: 5
+      },
+      {
+        id: 3,
+        title: "Relational Database & SQL Proficiency",
+        language: "SQL / Database Systems",
+        level: "Beginner",
+        description: "Assess your knowledge of joins, indexing, and transactional isolation.",
+        course_title: "Database Engineering Track",
+        time_limit_minutes: 10,
+        passing_score: 70,
+        total_questions: 5
+      }
+    ];
+
+    return { data: initialQuizzes, status: 200, statusText: 'OK', headers: {}, config };
   }
 
-  // 8. Notifications
+  // 9. Notifications
   if (url.includes('/notifications')) {
     let notifs = getStoredNotifications();
 
@@ -423,33 +467,33 @@ export const handleLocalRoute = async (config) => {
     return { data: notifs, status: 200, statusText: 'OK', headers: {}, config };
   }
 
-  // 9. Intelligent AI Chatbot Engine
+  // 10. Intelligent AI Chatbot Engine
   if (url.includes('/chat/suggestions')) {
     return {
       data: [
         {
           id: "sug-1",
-          category: "DSA & Coding",
-          title: "What is an Array & List Data Structure",
-          prompt: "Explain what an Array is with Python code examples, time complexity, and memory structure"
+          category: "Programming & Syntax",
+          title: `How do pointers/references work in ${profile.selected_language || 'Python'}?`,
+          prompt: `Explain how memory, variables, and references work in ${profile.selected_language || 'Python'} with code examples.`
         },
         {
           id: "sug-2",
-          category: "DSA & Sorting",
-          title: "QuickSort vs MergeSort in Python",
-          prompt: "Explain QuickSort vs MergeSort with Python code and time complexity comparison"
+          category: "DSA & Problem Solving",
+          title: "QuickSort vs MergeSort Complexity",
+          prompt: `Explain QuickSort vs MergeSort with code in ${profile.selected_language || 'Python'} and time complexity comparison.`
         },
         {
           id: "sug-3",
           category: "Database & SQL",
-          title: "ACID Properties & SQL Aggregation",
-          prompt: "Explain ACID properties with real-world examples and SQL query"
+          title: "ACID Properties & Indexing",
+          prompt: "Explain ACID properties with real-world examples and SQL query optimization."
         },
         {
           id: "sug-4",
-          category: "Machine Learning",
-          title: "Bias-Variance Tradeoff Intuitively",
-          prompt: "Explain the Bias-Variance tradeoff and how to fix overfitting"
+          category: "Career Roadmap",
+          title: `How to break into ${profile.career_stream || 'AI Engineering'}?`,
+          prompt: `Give me a structured step-by-step roadmap to become a successful ${profile.career_stream || 'AI Engineer'}.`
         }
       ],
       status: 200,
@@ -484,7 +528,7 @@ export const handleLocalRoute = async (config) => {
     };
   }
 
-  // 10. Auth Endpoints
+  // 11. Auth Endpoints
   if (url.includes('/auth/supabase-sync') || url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/forgot-password')) {
     const email = reqData.email || 'student@studypath.edu';
     let fullName = reqData.full_name;

@@ -12,7 +12,9 @@ import {
   Sparkles,
   HelpCircle,
   AlertCircle,
-  BookOpen
+  BookOpen,
+  Zap,
+  Calendar
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import api from '../services/api';
@@ -39,7 +41,7 @@ const QuizPlayerPage = () => {
         setLoading(true);
         const res = await api.get(`/quizzes/${id}`);
         setQuiz(res.data);
-        setTimeLeftSeconds(res.data.time_limit_minutes * 60);
+        setTimeLeftSeconds((res.data.time_limit_minutes || 10) * 60);
       } catch (err) {
         console.error('Failed to load quiz:', err);
       } finally {
@@ -85,11 +87,11 @@ const QuizPlayerPage = () => {
         selected_option_index: selectedAnswers[q.id] !== undefined ? selectedAnswers[q.id] : -1,
       }));
 
-      const totalTimeSpent = quiz.time_limit_minutes * 60 - timeLeftSeconds;
+      const totalTimeSpent = (quiz.time_limit_minutes || 10) * 60 - timeLeftSeconds;
 
       const res = await api.post(`/quizzes/${quiz.id}/submit`, {
         answers: answersPayload,
-        time_spent_seconds: Math.max(10, totalTimeSpent),
+        time_spent_seconds: Math.max(15, totalTimeSpent),
       });
 
       setResult(res.data);
@@ -120,8 +122,8 @@ const QuizPlayerPage = () => {
 
   if (loading || !quiz) {
     return (
-      <div className="h-96 flex items-center justify-center text-slate-400 animate-pulse">
-        Preparing quiz questions...
+      <div className="h-96 flex items-center justify-center text-slate-400 animate-pulse font-medium">
+        Generating and preparing assessment questions...
       </div>
     );
   }
@@ -138,8 +140,13 @@ const QuizPlayerPage = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <Badge variant="purple" size="sm">Diagnostic Quiz</Badge>
-            <span className="text-xs text-slate-500 dark:text-slate-400">{quiz.course_title}</span>
+            <Badge variant="purple" size="sm">Knowledge Testing</Badge>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{quiz.course_title || 'Core Assessment'}</span>
+            {quiz.is_dynamic && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 dark:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300">
+                AI GENERATED
+              </span>
+            )}
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-1">
             {quiz.title}
@@ -170,19 +177,19 @@ const QuizPlayerPage = () => {
               <Award className="w-9 h-9" />
             </div>
 
-            <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Quiz Evaluation Complete</h2>
+            <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Knowledge Evaluation Complete</h2>
             <div className="mt-2 text-4xl font-black text-emerald-500 dark:text-emerald-400">
               {result.score_percentage}%
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto">
+            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto font-medium">
               {result.feedback_message}
             </p>
 
             {/* Dynamic AI Profile Adaptation Alert */}
-            <div className="mt-5 p-3.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-500/30 text-xs text-indigo-900 dark:text-indigo-200 max-w-lg mx-auto flex items-center justify-center gap-2">
+            <div className="mt-5 p-3.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-500/30 text-xs text-indigo-900 dark:text-indigo-200 max-w-lg mx-auto flex items-center justify-center gap-2 font-medium">
               <Sparkles className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
               <span>
-                Learning efficiency updated to <span className="font-bold text-indigo-950 dark:text-white">{result.new_efficiency_score}%</span>. Recommendations recalculated!
+                Learning efficiency updated to <span className="font-bold text-indigo-950 dark:text-white">{result.new_efficiency_score}%</span>. Recommendations & study plan re-calibrated!
               </span>
             </div>
 
@@ -202,7 +209,15 @@ const QuizPlayerPage = () => {
                 icon={Sparkles}
                 onClick={() => navigate('/recommendations')}
               >
-                View Updated Recommendations
+                View Calibrated Courses
+              </Button>
+              <Button
+                variant="outline"
+                size="md"
+                icon={Calendar}
+                onClick={() => navigate('/study-plan')}
+              >
+                Updated Study Plan
               </Button>
             </div>
           </GlassCard>
@@ -224,12 +239,12 @@ const QuizPlayerPage = () => {
                       <h4 className="text-sm font-bold text-slate-900 dark:text-white">{rev.question_text}</h4>
                     </div>
                     {rev.is_correct ? (
-                      <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Correct (+20 pts)
+                      <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Correct
                       </span>
                     ) : (
-                      <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center gap-1">
-                        <XCircle className="w-3.5 h-3.5" /> Incorrect
+                      <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center gap-1 shrink-0">
+                        <XCircle className="w-3.5 h-3.5" /> Needs Review
                       </span>
                     )}
                   </div>
@@ -257,7 +272,7 @@ const QuizPlayerPage = () => {
                             <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">Correct Answer</span>
                           )}
                           {isChosen && !isCorrectAnswer && (
-                            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase">Your Answer</span>
+                            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase">Your Selection</span>
                           )}
                         </div>
                       );
@@ -265,7 +280,7 @@ const QuizPlayerPage = () => {
                   </div>
 
                   {/* Explanation Box */}
-                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/5 text-xs text-slate-700 dark:text-slate-300 space-y-1">
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/5 text-xs text-slate-700 dark:text-slate-300 space-y-1 font-medium">
                     <span className="font-bold text-indigo-600 dark:text-indigo-300 block">💡 Detailed Explanation:</span>
                     <p>{rev.explanation}</p>
                   </div>
@@ -313,7 +328,7 @@ const QuizPlayerPage = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                   <span>Question {currentQuestionIdx + 1} of {questions.length}</span>
-                  <Badge variant="slate" size="sm">{currentQ.subject_tag || 'Core'}</Badge>
+                  <Badge variant="slate" size="sm">{currentQ.subject_tag || quiz.language || 'Core'}</Badge>
                 </div>
                 <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-relaxed">
                   {currentQ.question_text}
@@ -337,7 +352,7 @@ const QuizPlayerPage = () => {
                     >
                       <span>{option}</span>
                       <div
-                        className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                        className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
                           isSelected
                             ? 'border-indigo-500 bg-indigo-600 text-white'
                             : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900'

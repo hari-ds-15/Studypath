@@ -26,7 +26,7 @@ const navigationItems = [
   { name: 'Course Recommendations', to: '/recommendations', icon: Compass, badge: 'AI' },
   { name: 'Study Plan', to: '/study-plan', icon: Calendar },
   { name: 'Electives', to: '/electives', icon: Layers },
-  { name: 'Quizzes', to: '/quizzes', icon: HelpCircle },
+  { name: 'Knowledge Testing', to: '/quizzes', icon: HelpCircle },
   { name: 'Analytics', to: '/analytics', icon: BarChart3 },
   { name: 'Profile', to: '/profile', icon: User },
   { name: 'Settings', to: '/settings', icon: Settings },

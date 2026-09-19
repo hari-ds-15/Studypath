@@ -26,7 +26,8 @@ import {
   Code,
   RotateCcw,
   Search,
-  ExternalLink
+  ExternalLink,
+  Compass
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -50,9 +51,19 @@ import Modal from '../components/common/Modal';
 import Input from '../components/common/Input';
 import AnimatedCounter from '../components/animations/AnimatedCounter';
 import FreeCertificatesAndCoursesHub from '../components/common/FreeCertificatesAndCoursesHub';
+import { SUPPORTED_LANGUAGES, DIFFICULTY_LEVELS } from '../services/dynamicQuizEngine';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SESSION_TYPES = ['Video', 'Practice', 'Quiz', 'Revision', 'Reading'];
+
+const CAREER_STREAM_OPTIONS = [
+  'AI Engineer',
+  'Data Science',
+  'Full Stack Developer',
+  'Backend Systems (Java/C++/Go/Rust)',
+  'Cloud & DevOps',
+  'Cybersecurity'
+];
 
 const TYPE_STYLES = {
   Video: {
@@ -132,8 +143,11 @@ const DashboardPage = () => {
 
   // Academic Goals Modal State
   const [academicModalOpen, setAcademicModalOpen] = useState(false);
-  const [weeklyTargetHours, setWeeklyTargetHours] = useState(20);
-  const [averageStudyHours, setAverageStudyHours] = useState(3.5);
+  const [selectedLanguage, setSelectedLanguage] = useState('Python');
+  const [skillLevel, setSkillLevel] = useState('Beginner');
+  const [careerStream, setCareerStream] = useState('AI Engineer');
+  const [weeklyTargetHours, setWeeklyTargetHours] = useState(21);
+  const [averageStudyHours, setAverageStudyHours] = useState(3.0);
   const [learningSpeed, setLearningSpeed] = useState('Balanced');
   const [studyMethodStyle, setStudyMethodStyle] = useState('Video -> Practice -> Quiz -> Revision');
   const [academicSaving, setAcademicSaving] = useState(false);
@@ -151,10 +165,15 @@ const DashboardPage = () => {
       setRecommendations(recsRes.data);
       setWeeklyPlan(planRes.data);
       setProfile(profileRes.data);
-      setWeeklyTargetHours(profileRes.data.weekly_target_hours || 20);
-      setAverageStudyHours(profileRes.data.average_study_hours || 3.5);
-      setLearningSpeed(profileRes.data.learning_speed || 'Balanced');
-      setStudyMethodStyle(profileRes.data.study_method_style || 'Video -> Practice -> Quiz -> Revision');
+
+      const p = profileRes.data;
+      setSelectedLanguage(p.selected_language || 'Python');
+      setSkillLevel(p.skill_level || 'Beginner');
+      setCareerStream(p.career_stream || 'AI Engineer');
+      setWeeklyTargetHours(p.weekly_target_hours || 21);
+      setAverageStudyHours(p.daily_study_hours || p.average_study_hours || 3.0);
+      setLearningSpeed(p.learning_speed || 'Balanced');
+      setStudyMethodStyle(p.study_method_style || 'Video -> Practice -> Quiz -> Revision');
 
       // Auto-set selected day to current day of week if in range
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -172,6 +191,18 @@ const DashboardPage = () => {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  const handleDailyHoursChange = (val) => {
+    const daily = parseFloat(val) || 0;
+    setAverageStudyHours(daily);
+    setWeeklyTargetHours(Math.round(daily * 7 * 10) / 10);
+  };
+
+  const handleWeeklyHoursChange = (val) => {
+    const weekly = parseFloat(val) || 0;
+    setWeeklyTargetHours(weekly);
+    setAverageStudyHours(Math.round((weekly / 7) * 10) / 10);
+  };
 
   const handleToggleCompleted = async (sessionId) => {
     try {
@@ -197,7 +228,7 @@ const DashboardPage = () => {
   const handleOpenAdd = (defaultDay = selectedDay) => {
     setEditingSessionId(null);
     setTitle('');
-    setSubjectName('Data Structures & Algorithms');
+    setSubjectName(`${profile?.selected_language || 'Python'} Problem Solving`);
     setDayOfWeek(defaultDay);
     setStartTime('18:00');
     setEndTime('19:15');
@@ -268,18 +299,24 @@ const DashboardPage = () => {
     try {
       setAcademicSaving(true);
       await api.put('/student/profile', {
+        selected_language: selectedLanguage,
+        skill_level: skillLevel,
+        career_stream: careerStream,
         weekly_target_hours: parseFloat(weeklyTargetHours),
+        daily_study_hours: parseFloat(averageStudyHours),
         average_study_hours: parseFloat(averageStudyHours),
         learning_speed: learningSpeed,
         study_method_style: studyMethodStyle
       });
-      // Re-fetch dashboard data
-      const [analyticsRes, planRes, profileRes] = await Promise.all([
+      // Re-fetch all dashboard data to synchronize completely
+      const [analyticsRes, recsRes, planRes, profileRes] = await Promise.all([
         api.get('/analytics?timeframe=30d'),
+        api.get('/recommendations/courses'),
         api.post('/study-plan/generate'),
         api.get('/student/profile')
       ]);
       setAnalytics(analyticsRes.data);
+      setRecommendations(recsRes.data);
       setWeeklyPlan(planRes.data);
       setProfile(profileRes.data);
       setAcademicModalOpen(false);
@@ -332,14 +369,13 @@ const DashboardPage = () => {
         <div className="space-y-2 z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-stone-950/10 border border-stone-950/15 text-stone-900 text-xs font-bold shadow-xs">
             <Sparkles className="w-3.5 h-3.5 text-stone-950" />
-            AI Academic & Study Optimization Engine Active
+            AI Academic & Career Optimization Engine Active
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-950 tracking-tight">
             Welcome back, {userFirstName}! 👋
           </h1>
           <p className="text-xs sm:text-sm text-stone-900 max-w-xl font-semibold">
-            Weekly Target: <span className="font-extrabold text-stone-950">{profile?.weekly_target_hours || 20} hours</span> • Strategy: <span className="font-extrabold text-stone-950">{profile?.learning_speed || 'Balanced'} Pace</span>. You have{' '}
-            <span className="font-extrabold text-stone-950 bg-white/70 px-2 py-0.5 rounded-lg">{weeklyPlan?.pending_sessions_count || 0} upcoming sessions</span> this week.
+            Track: <span className="font-extrabold text-stone-950 bg-white/70 px-2 py-0.5 rounded-lg">{profile?.career_stream || 'AI Engineer'} ({profile?.selected_language || 'Python'})</span> • Level: <span className="font-extrabold text-stone-950">{profile?.skill_level || 'Beginner'}</span> • Target: <span className="font-extrabold text-stone-950">{profile?.weekly_target_hours || 21} hrs/wk ({profile?.daily_study_hours || 3.0}h/day)</span>.
           </p>
         </div>
 
@@ -349,6 +385,7 @@ const DashboardPage = () => {
             variant="primary"
             icon={Target}
             onClick={() => setAcademicModalOpen(true)}
+            className="shadow-md"
           >
             Edit Academic Goals
           </Button>
@@ -358,7 +395,7 @@ const DashboardPage = () => {
             icon={Calendar}
             onClick={() => navigate('/study-plan')}
           >
-            Full Planner
+            Full Weekly Plan
           </Button>
         </div>
       </motion.div>
@@ -368,18 +405,18 @@ const DashboardPage = () => {
         {/* KPI 1 */}
         <GlassCard className="p-4 sm:p-5" hover>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Weekly Study</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Weekly Target</span>
             <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30">
               <Clock className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="text-2xl font-black text-slate-900 dark:text-white">
-              <AnimatedCounter value={analytics?.total_study_hours || 18.5} decimals={1} suffix=" hrs" />
+              <AnimatedCounter value={profile?.weekly_target_hours || 21.0} decimals={1} suffix=" hrs" />
             </div>
             <div className="mt-1 flex items-center justify-between text-[11px] font-bold">
               <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5" /> Target: {profile?.weekly_target_hours || 20}h
+                <TrendingUp className="w-3.5 h-3.5" /> {profile?.daily_study_hours || 3.0}h / day
               </span>
               <button
                 type="button"
@@ -395,7 +432,7 @@ const DashboardPage = () => {
         {/* KPI 2 */}
         <GlassCard className="p-4 sm:p-5" hover>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Quiz Average</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Knowledge Testing</span>
             <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30">
               <HelpCircle className="w-4 h-4" />
             </div>
@@ -405,7 +442,7 @@ const DashboardPage = () => {
               <AnimatedCounter value={analytics?.quiz_average_score || 82.5} decimals={1} suffix="%" />
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-[11px] text-purple-700 dark:text-purple-300 font-bold">
-              <span>{analytics?.quizzes_taken_count || 5} tests evaluated</span>
+              <span>{profile?.selected_language || 'Python'} & Core CS</span>
             </div>
           </div>
         </GlassCard>
@@ -420,10 +457,10 @@ const DashboardPage = () => {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-black text-slate-900 dark:text-white">
-              <AnimatedCounter value={analytics?.learning_efficiency_score || 84.5} decimals={1} suffix="/100" />
+              <AnimatedCounter value={profile?.learning_efficiency_score || 84.5} decimals={1} suffix="/100" />
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-300 font-bold">
-              <span>+6.2% vs baseline</span>
+              <span>Calibrated by Testing</span>
             </div>
           </div>
         </GlassCard>
@@ -431,17 +468,17 @@ const DashboardPage = () => {
         {/* KPI 4 */}
         <GlassCard className="p-4 sm:p-5" hover>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Course Progress</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Career Stream</span>
             <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
-              <BookOpen className="w-4 h-4" />
+              <Compass className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900 dark:text-white">
-              <AnimatedCounter value={analytics?.course_completion_rate || 68.0} decimals={0} suffix="%" />
+            <div className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+              {profile?.career_stream || 'AI Engineer'}
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-300 font-bold">
-              <span>{analytics?.enrolled_courses_count || 3} Active Tracks</span>
+              <span>4 Stages Active</span>
             </div>
           </div>
         </GlassCard>
@@ -449,17 +486,17 @@ const DashboardPage = () => {
         {/* KPI 5 */}
         <GlassCard className="p-4 sm:p-5" hover>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Free Courses & Certs</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Free Certs & Videos</span>
             <div className="p-2 rounded-xl bg-sky-50 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/30">
               <Award className="w-4 h-4 text-sky-500" />
             </div>
           </div>
           <div className="mt-3">
             <div className="text-2xl font-black text-slate-900 dark:text-white">
-              <AnimatedCounter value={12} decimals={0} suffix=" Domains" />
+              <AnimatedCounter value={40} decimals={0} suffix="+ Courses" />
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-[11px] text-sky-700 dark:text-sky-300 font-bold">
-              <span>Free Certs & YouTube Hub</span>
+              <span>Multi-Language Hub</span>
             </div>
           </div>
         </GlassCard>
@@ -481,7 +518,7 @@ const DashboardPage = () => {
                 onClick={() => setAcademicModalOpen(true)}
                 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline px-2 py-1 rounded bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800"
               >
-                Change Target ({profile?.weekly_target_hours || 20}h)
+                Change Target ({profile?.weekly_target_hours || 21}h)
               </button>
             </div>
           </div>
@@ -548,7 +585,7 @@ const DashboardPage = () => {
               </h2>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1">
-              Directly edit, reschedule, mark completed, or add custom sessions for each day of the week.
+              Synchronized with <span className="font-bold text-indigo-600 dark:text-indigo-400">{profile?.selected_language || 'Python'}</span> & <span className="font-bold text-indigo-600 dark:text-indigo-400">{profile?.career_stream || 'AI Engineer'}</span> roadmap.
             </p>
           </div>
 
@@ -559,7 +596,7 @@ const DashboardPage = () => {
               icon={Target}
               onClick={() => setAcademicModalOpen(true)}
             >
-              Academic Goals ({profile?.weekly_target_hours || 20}h/wk)
+              Academic Goals ({profile?.weekly_target_hours || 21}h/wk)
             </Button>
             <Button
               size="sm"
@@ -724,9 +761,11 @@ const DashboardPage = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              Top AI Recommendations <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              Personalized Recommendations <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
             </h2>
-            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">Tailored based on your strong Python skills & target career in AI</p>
+            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+              Tailored based on {profile?.selected_language || 'Python'} & target stream {profile?.career_stream || 'AI Engineer'}
+            </p>
           </div>
           <Link
             to="/recommendations"
@@ -744,15 +783,9 @@ const DashboardPage = () => {
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
                     {course.category}
                   </span>
-                  {(user?.onboarding_completed || profile?.onboarding_completed) ? (
-                    <Badge variant="emerald" size="sm">
-                      {course.match_score}% Match
-                    </Badge>
-                  ) : (
-                    <Badge variant="amber" size="sm">
-                      Core Subject
-                    </Badge>
-                  )}
+                  <Badge variant="emerald" size="sm">
+                    {course.match_score}% Match
+                  </Badge>
                 </div>
 
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-2">{course.course_name}</h3>
@@ -927,26 +960,67 @@ const DashboardPage = () => {
       <Modal
         isOpen={academicModalOpen}
         onClose={() => setAcademicModalOpen(false)}
-        title="Edit Academic Goals & Study Targets"
-        subtitle="Adjust your weekly target hours and study speed. The engine will automatically rebalance your schedule."
+        title="Edit Academic Goals & Career Preferences"
+        subtitle="Changes immediately update course recommendations, study plan generation, and target hours."
       >
         <form onSubmit={handleSaveAcademicGoals} className="space-y-4">
+          {/* Programming Language & Skill Level */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Weekly Target Hours (hrs)
+                Primary Programming Language
               </label>
-              <Input
-                type="number"
-                min="2"
-                max="80"
-                step="0.5"
-                value={weeklyTargetHours}
-                onChange={(e) => setWeeklyTargetHours(e.target.value)}
-                required
-              />
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {SUPPORTED_LANGUAGES.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
             </div>
 
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Current Skill Level
+              </label>
+              <select
+                value={skillLevel}
+                onChange={(e) => setSkillLevel(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {DIFFICULTY_LEVELS.map((lvl) => (
+                  <option key={lvl} value={lvl}>
+                    {lvl}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Career Stream */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Career Specialization Stream / Roadmap
+            </label>
+            <select
+              value={careerStream}
+              onChange={(e) => setCareerStream(e.target.value)}
+              className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              {CAREER_STREAM_OPTIONS.map((stream) => (
+                <option key={stream} value={stream}>
+                  {stream}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Hours Alignment */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                 Daily Study Target (hrs/day)
@@ -957,40 +1031,58 @@ const DashboardPage = () => {
                 max="16"
                 step="0.5"
                 value={averageStudyHours}
-                onChange={(e) => setAverageStudyHours(e.target.value)}
+                onChange={(e) => handleDailyHoursChange(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Weekly Target Hours (hrs)
+              </label>
+              <Input
+                type="number"
+                min="2"
+                max="80"
+                step="0.5"
+                value={weeklyTargetHours}
+                onChange={(e) => handleWeeklyHoursChange(e.target.value)}
                 required
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Learning Speed / Academic Pace
-            </label>
-            <select
-              value={learningSpeed}
-              onChange={(e) => setLearningSpeed(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="Intensive">Intensive (Fast-track, high volume)</option>
-              <option value="Balanced">Balanced (Optimal retention & practice)</option>
-              <option value="Relaxed">Relaxed (Steady, flexible pace)</option>
-            </select>
-          </div>
+          {/* Learning Speed & Style */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Academic Pace / Speed
+              </label>
+              <select
+                value={learningSpeed}
+                onChange={(e) => setLearningSpeed(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="Intensive">Intensive (Fast-track)</option>
+                <option value="Balanced">Balanced (Optimal practice)</option>
+                <option value="Relaxed">Relaxed (Flexible pace)</option>
+              </select>
+            </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Study Method Flow
-            </label>
-            <select
-              value={studyMethodStyle}
-              onChange={(e) => setStudyMethodStyle(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="Video -> Practice -> Quiz -> Revision">Video ➔ Practice ➔ Quiz ➔ Revision (Recommended)</option>
-              <option value="Theory First -> Project Based">Theory First ➔ Project Based</option>
-              <option value="Quiz & Active Recall Driven">Quiz & Active Recall Driven</option>
-            </select>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Study Method Flow
+              </label>
+              <select
+                value={studyMethodStyle}
+                onChange={(e) => setStudyMethodStyle(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="Video -> Practice -> Quiz -> Revision">Video ➔ Practice ➔ Quiz ➔ Revision</option>
+                <option value="Theory First -> Project Based">Theory First ➔ Project Based</option>
+                <option value="Quiz & Active Recall Driven">Quiz & Active Recall Driven</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
@@ -1006,7 +1098,7 @@ const DashboardPage = () => {
               variant="primary"
               disabled={academicSaving}
             >
-              {academicSaving ? 'Updating Schedule...' : 'Save & Rebalance Plan'}
+              {academicSaving ? 'Saving & Rebalancing...' : 'Save & Sync Recommendations'}
             </Button>
           </div>
         </form>
@@ -1016,4 +1108,3 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
-

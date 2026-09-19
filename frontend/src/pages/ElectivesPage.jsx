@@ -14,7 +14,10 @@ import {
   BookOpen,
   Award,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  Lock,
+  Unlock,
+  Check
 } from 'lucide-react';
 import api from '../services/api';
 import GlassCard from '../components/common/GlassCard';
@@ -23,12 +26,20 @@ import Badge from '../components/common/Badge';
 import Modal from '../components/common/Modal';
 import FreeResourcesGrid, { YouTubeIcon } from '../components/common/FreeResourcesGrid';
 
+const DIFFICULTY_ORDER = {
+  Beginner: 1,
+  Intermediate: 2,
+  Advanced: 3
+};
+
 const ElectivesPage = () => {
   const navigate = useNavigate();
   const [electives, setElectives] = useState([]);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedLevel, setSelectedLevel] = useState('All');
 
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedElective, setSelectedElective] = useState(null);
@@ -36,8 +47,17 @@ const ElectivesPage = () => {
   const fetchElectives = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/recommendations/electives');
-      setElectives(res.data);
+      const [recsRes, profileRes] = await Promise.allSettled([
+        api.get('/recommendations/electives'),
+        api.get('/student/profile')
+      ]);
+
+      if (recsRes.status === 'fulfilled') {
+        setElectives(recsRes.value.data);
+      }
+      if (profileRes.status === 'fulfilled') {
+        setProfile(profileRes.value.data);
+      }
     } catch (err) {
       console.error('Failed to load electives:', err);
     } finally {
@@ -61,14 +81,28 @@ const ElectivesPage = () => {
     }
   };
 
-  const filteredElectives = electives.filter((el) => {
-    const matchesSearch =
-      el.course_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      el.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      el.career_relevance.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCat = selectedCategory === 'All' || el.category === selectedCategory;
-    return matchesSearch && matchesCat;
-  });
+  // Beginner-First sorting and prerequisite gating
+  const sortedAndFilteredElectives = electives
+    .filter((el) => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        el.course_name.toLowerCase().includes(q) ||
+        el.category.toLowerCase().includes(q) ||
+        el.career_relevance.toLowerCase().includes(q) ||
+        (el.tags && el.tags.some(t => t.toLowerCase().includes(q)));
+
+      const matchesCat = selectedCategory === 'All' || el.category === selectedCategory;
+      const matchesLvl = selectedLevel === 'All' || el.difficulty.toLowerCase() === selectedLevel.toLowerCase();
+
+      return matchesSearch && matchesCat && matchesLvl;
+    })
+    .sort((a, b) => {
+      const orderA = DIFFICULTY_ORDER[a.difficulty] || 2;
+      const orderB = DIFFICULTY_ORDER[b.difficulty] || 2;
+      if (orderA !== orderB) return orderA - orderB; // Beginner first!
+      return b.match_score - a.match_score;
+    });
 
   return (
     <div className="space-y-6 select-none">
@@ -79,30 +113,41 @@ const ElectivesPage = () => {
             Elective Recommendations <Layers className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Specialized tracks mapped directly to industry career demands and prerequisite fulfillment
+            Beginner-First specialized tracks mapped to career streams (<span className="font-bold text-indigo-600 dark:text-indigo-300">{profile?.career_stream || 'AI Engineer'}</span>) with prerequisite gating.
           </p>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <GlassCard className="p-4 flex flex-col sm:flex-row items-center gap-3">
+      {/* Filter and Search Bar */}
+      <GlassCard className="p-4 flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="relative flex-1 w-full">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search electives by track (AI, Big Data, Cloud, Cybersecurity)..."
+            placeholder="Search electives by track (AI, Big Data, Cloud, Cybersecurity, Rust)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-100/90 dark:bg-[#0a0f1d] border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-[#0d1428] focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-100/90 dark:bg-[#0a0f1d] border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-[#0d1428] focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-medium"
           />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
-          {['All', 'AI & ML', 'Data Science', 'Cloud & DevOps', 'Cybersecurity'].map((cat) => (
+        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto">
+          <select
+            value={selectedLevel}
+            onChange={(e) => setSelectedLevel(e.target.value)}
+            className="rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-white py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="All">Level: All Levels</option>
+            <option value="Beginner">Beginner (Foundational)</option>
+            <option value="Intermediate">Intermediate</option>
+            <option value="Advanced">Advanced (Capstone)</option>
+          </select>
+
+          {['All', 'AI & ML', 'Data Science', 'Systems', 'Cloud & DevOps', 'Cybersecurity'].map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                   : 'bg-slate-100 dark:bg-[#162038] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-[#1f2d4e] border border-slate-200 dark:border-slate-700/80 shadow-xs'
@@ -114,6 +159,16 @@ const ElectivesPage = () => {
         </div>
       </GlassCard>
 
+      {/* Beginner First Guidance Banner */}
+      <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-500/30 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+          ⚡
+        </div>
+        <p className="text-xs text-indigo-950 dark:text-indigo-200 font-medium">
+          <span className="font-bold">Beginner-First Progression:</span> Electives are prioritized by foundational entry barriers. Complete level-appropriate courses and prerequisites before advancing to specialized advanced tracks.
+        </p>
+      </div>
+
       {/* Electives Grid */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -121,9 +176,15 @@ const ElectivesPage = () => {
             <div key={i} className="h-64 rounded-2xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 animate-pulse" />
           ))}
         </div>
+      ) : sortedAndFilteredElectives.length === 0 ? (
+        <GlassCard className="p-12 text-center space-y-3">
+          <BookOpen className="w-10 h-10 text-slate-400 mx-auto" />
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">No electives match your active filter criteria</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Try resetting the category or difficulty filters.</p>
+        </GlassCard>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredElectives.map((el) => (
+          {sortedAndFilteredElectives.map((el) => (
             <GlassCard key={el.course_id} className="p-6 flex flex-col justify-between space-y-5" hover>
               <div className="space-y-4">
                 {/* Header with Match & Save */}
@@ -135,7 +196,9 @@ const ElectivesPage = () => {
                         {el.match_score}% Match
                       </Badge>
                       <Badge variant="indigo" size="sm">{el.category}</Badge>
-                      <Badge variant="slate" size="sm">{el.difficulty}</Badge>
+                      <Badge variant={el.difficulty === 'Beginner' ? 'emerald' : el.difficulty === 'Intermediate' ? 'purple' : 'rose'} size="sm">
+                        {el.difficulty}
+                      </Badge>
                     </div>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white pt-1">{el.course_name}</h3>
                   </div>
@@ -170,10 +233,10 @@ const ElectivesPage = () => {
 
                   <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#0a0f1d]/80 border border-slate-200 dark:border-slate-800/80 space-y-1">
                     <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-indigo-500 dark:text-indigo-400" /> Key Prerequisites
+                      <CheckCircle2 className="w-3 h-3 text-indigo-500 dark:text-indigo-400" /> Prerequisite Status
                     </span>
                     <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                      {el.prerequisites?.join(', ') || 'Foundations'}
+                      {el.prerequisites?.join(', ') || 'No Prerequisites (Open to All)'}
                     </p>
                   </div>
                 </div>
