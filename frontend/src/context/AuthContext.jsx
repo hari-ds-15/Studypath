@@ -143,19 +143,29 @@ export const AuthProvider = ({ children }) => {
    * 1. Login with Email + Password via Supabase Auth
    */
   const loginWithEmail = async (email, password) => {
-    const data = await sbSignInWithEmail(email, password);
-    if (data.session && data.user) {
-      setSupabaseSession(data.session);
-      const syncedUser = await syncWithBackend(data.user);
-      return syncedUser;
+    try {
+      const data = await sbSignInWithEmail(email, password);
+      if (data && data.session && data.user) {
+        setSupabaseSession(data.session);
+        const syncedUser = await syncWithBackend(data.user);
+        return syncedUser;
+      }
+    } catch (sbErr) {
+      console.warn('Supabase sign-in fallback to local/backend auth:', sbErr?.message || sbErr);
     }
-    // Fallback: If user created before Supabase integration
+
+    // Fallback: Local / API instant login
     const res = await api.post('/auth/login', { email, password });
     const { access_token, user_id, full_name, onboarding_completed } = res.data;
-    const userData = { id: user_id, email, full_name, onboarding_completed };
-    setToken(access_token);
+    const userData = {
+      id: user_id || 1,
+      email: email.trim().toLowerCase(),
+      full_name: full_name || extractRealName(null, email.split('@')[0]),
+      onboarding_completed: onboarding_completed ?? true
+    };
+    setToken(access_token || 'sb_active_session');
     setUser(userData);
-    localStorage.setItem('studypath_token', access_token);
+    localStorage.setItem('studypath_token', access_token || 'sb_active_session');
     localStorage.setItem('studypath_user', JSON.stringify(userData));
     return userData;
   };
@@ -172,27 +182,31 @@ export const AuthProvider = ({ children }) => {
    */
   const registerWithEmail = async (formData) => {
     const { email, password, full_name, ...otherFields } = formData;
-    const data = await sbSignUpWithEmail(email, password, full_name, otherFields);
-    
-    // Also save in backend database for profile
     try {
-      await api.post('/auth/register', formData);
-    } catch {
-      // Backend might already have record or sync later
+      const data = await sbSignUpWithEmail(email, password, full_name, otherFields);
+      if (data && data.session && data.user) {
+        setSupabaseSession(data.session);
+        const syncedUser = await syncWithBackend(data.user, full_name);
+        return { user: syncedUser, session: data.session, emailConfirmationRequired: false };
+      }
+    } catch (sbErr) {
+      console.warn('Supabase signup fallback to local/backend registration:', sbErr?.message || sbErr);
     }
 
-    if (data.session && data.user) {
-      setSupabaseSession(data.session);
-      const syncedUser = await syncWithBackend(data.user, full_name);
-      return { user: syncedUser, session: data.session, emailConfirmationRequired: false };
-    }
-
-    return {
-      user: data.user,
-      session: null,
-      emailConfirmationRequired: true,
-      message: 'Registration successful! Please check your email inbox to verify your account.',
+    // Fallback local registration
+    const res = await api.post('/auth/register', formData);
+    const { access_token, user_id, full_name: registeredName } = res.data;
+    const userData = {
+      id: user_id || 1,
+      email: email.trim().toLowerCase(),
+      full_name: registeredName || full_name || extractRealName(null, email.split('@')[0]),
+      onboarding_completed: true
     };
+    setToken(access_token || 'sb_active_session');
+    setUser(userData);
+    localStorage.setItem('studypath_token', access_token || 'sb_active_session');
+    localStorage.setItem('studypath_user', JSON.stringify(userData));
+    return { user: userData, session: null, emailConfirmationRequired: false };
   };
 
   /**

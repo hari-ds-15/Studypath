@@ -569,3 +569,85 @@ export const FALLBACK_QUIZ_HISTORY = [
     created_at: new Date(Date.now() - 172800000).toISOString()
   }
 ];
+
+export const FALLBACK_NOTIFICATIONS = [
+  {
+    id: 1,
+    type: "study_reminder",
+    title: "Upcoming Study Session: ML Foundations",
+    message: "You have a scheduled 45-minute practice session on Neural Architectures at 18:00 today.",
+    created_at: new Date(Date.now() - 3600000).toISOString(),
+    is_read: false,
+    action_url: "/study-plan"
+  },
+  {
+    id: 2,
+    type: "quiz_alert",
+    title: "Diagnostic Assessment Passed! 🎉",
+    message: "Congratulations! You scored 100% on Machine Learning Fundamentals & Scikit-Learn Diagnostic.",
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+    is_read: false,
+    action_url: "/quizzes"
+  },
+  {
+    id: 3,
+    type: "recommendation",
+    title: "New Elective Recommendation Available",
+    message: "Generative AI & LLMs (CS-505) has a 95% match with your AI Engineer career pathway.",
+    created_at: new Date(Date.now() - 172800000).toISOString(),
+    is_read: true,
+    action_url: "/electives"
+  },
+  {
+    id: 4,
+    type: "progress_summary",
+    title: "Weekly Learning Milestone Reached",
+    message: "You have completed 14.5 hours of focused study this week. Keep up the momentum!",
+    created_at: new Date(Date.now() - 259200000).toISOString(),
+    is_read: true,
+    action_url: "/analytics"
+  }
+];
+
+export const FALLBACK_STUDY_METHOD = {
+  recommended_pipeline: "Video Lecture ➔ Guided Practice ➔ Checkpoint Quiz ➔ Spaced Summary",
+  why_selected: "Optimized for multimodal learners. Research shows 15-20 min video chunks followed by active hands-on coding and micro-quizzing boosts 30-day recall by up to 42%.",
+  suitable_session_length: 45,
+  preferred_content_type: "Interactive & Practice",
+  learning_speed: "Balanced",
+  expected_retention_boost: "+42% Conceptual Mastery",
+  steps: [
+    {
+      step_number: 1,
+      name: "Concept Priming & Video Lecture",
+      duration_minutes: 18,
+      icon: "Video",
+      description: "Watch structured, bite-sized conceptual lessons with active note-taking.",
+      tips: "Pause at core definitions and write code syntax in your own words."
+    },
+    {
+      step_number: 2,
+      name: "Guided Hands-on Practice",
+      duration_minutes: 14,
+      icon: "Code",
+      description: "Implement the newly learned concepts on sandboxes and coding challenges.",
+      tips: "Solve the problem from scratch without looking at the reference solution first."
+    },
+    {
+      step_number: 3,
+      name: "Micro-Quiz & Diagnostics",
+      duration_minutes: 8,
+      icon: "HelpCircle",
+      description: "Take a fast 5-question timed quiz to measure active neural retrieval.",
+      tips: "Review explanations immediately for any hesitant or incorrect answers."
+    },
+    {
+      step_number: 4,
+      name: "Spaced Summary & Flashcard",
+      duration_minutes: 5,
+      icon: "RotateCcw",
+      description: "Condense the core takeaways into a reusable formula or cheat-sheet snippet.",
+      tips: "Schedule your next review within 48 hours for long-term consolidation."
+    }
+  ]
+};
