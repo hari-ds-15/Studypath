@@ -1,6 +1,6 @@
 /**
- * StudyPath Direct Gemini 3.5/3.6 Flash Integration
- * Powers both the AI Tutor Page & Floating AI Assistant with Google Gemini.
+ * StudyPath Direct Google Gemini AI Integration
+ * Powers the AI Tutor Page, Knowledge Testing Generator & Floating AI Assistant with Google Gemini.
  */
 
 // Fallback runtime key (Base64-decoded) if not provided in Vercel environment variables
@@ -10,22 +10,28 @@ const DEFAULT_FALLBACK_KEY = typeof atob !== 'undefined'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || DEFAULT_FALLBACK_KEY;
 
+// Updated candidate models list with active Gemini 3.x Flash models
 const CANDIDATE_MODELS = [
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3-flash",
   "gemini-2.5-flash",
   "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-pro"
+  "gemini-1.5-flash"
 ];
 
-const SYSTEM_INSTRUCTION = `You are StudyPath AI — a warm, encouraging, and world-class AI Study Companion & Coding Mentor.
-Guidelines:
-1. GREETINGS: If greeted with 'hi', 'hello', 'hey', respond warmly, address the student by name if known, and suggest 3 high-impact learning areas.
-2. CODE & CS: Give crystal-clear explanations with clean, commented Python/JavaScript/SQL/C++ code blocks and Big-O complexities.
-3. STUDY PLANNING: Suggest active recall, Feynman technique, and spaced repetition schedules.
-4. FORMATTING: Use clean Markdown (headers, bullet points, code blocks, bold keywords). Keep responses direct and structured.`;
+const SYSTEM_INSTRUCTION = `You are StudyPath AI — a friendly, brilliant, and comprehensive AI Study Companion, Coding Mentor, and Universal Knowledge Assistant.
 
+Instructions:
+1. UNIVERSAL ANSWERING: Answer ANY question the user asks accurately, clearly, and thoroughly — whether it is about Computer Science, Programming (Python, Java, C, C++, Rust, Go, JS/TS, SQL), Mathematics, Science, Engineering, Study Strategies, Career Roadmaps, or General Knowledge.
+2. GREETINGS: If greeted with 'hi', 'hello', 'hey', respond warmly, address the student by name, and invite them to ask questions or explore topics.
+3. CODE & TECH: Provide clean, well-commented code snippets with time & space complexities when relevant.
+4. STUDY PLANNING: Give actionable, evidence-based study protocols (active recall, spaced repetition, Feynman technique) when requested.
+5. FORMATTING: Use structured Markdown (headers, bullet points, bold text, code blocks) to make your answers easy to read and understand.`;
+
+/**
+ * Ask Google Gemini API for an intelligent, contextual response to ANY question
+ */
 export async function askGemini(prompt, studentName = 'Student') {
   const customSystemPrompt = `${SYSTEM_INSTRUCTION}\nStudent Name: ${studentName}`;
 
@@ -37,12 +43,12 @@ export async function askGemini(prompt, studentName = 'Student') {
           contents: [
             {
               role: "user",
-              parts: [{ text: `${customSystemPrompt}\n\nStudent Question:\n${prompt}` }]
+              parts: [{ text: `${customSystemPrompt}\n\nUser Question:\n${prompt}` }]
             }
           ],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 1500,
+            maxOutputTokens: 2048,
           }
         };
 
@@ -65,9 +71,12 @@ export async function askGemini(prompt, studentName = 'Student') {
               suggested_followups: generateContextualFollowups(prompt, outputText)
             };
           }
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.warn(`[Gemini API] Model ${model} returned ${response.status}:`, errorData?.error?.message);
         }
       } catch (err) {
-        console.warn(`[Gemini API] Call to ${model} encountered network error:`, err);
+        console.warn(`[Gemini API] Call to ${model} network error:`, err.message);
       }
     }
   }
@@ -76,36 +85,34 @@ export async function askGemini(prompt, studentName = 'Student') {
   return generateIntelligentFallbackResponse(prompt, studentName);
 }
 
+/**
+ * Intelligent Fallback Response in case of total offline disconnect
+ */
 export function generateIntelligentFallbackResponse(prompt, studentName = 'Student') {
   const clean = (prompt || '').trim().toLowerCase();
   let botReply = '';
 
   if (/^(hi|hello|hey|howdy|good morning|good evening|yo)\b/i.test(clean)) {
-    botReply = `👋 Hello **${studentName}**! Great to see you!\n\nI am your **StudyPath AI Tutor & Academic Mentor**, powered by **Google Gemini**.\n\nHere are key things we can do together right now:\n* 🧠 **Master core CS algorithms** (Arrays, Linked Lists, Trees, Graphs, Dynamic Programming)\n* 💻 **Write & debug clean code** in Python, SQL, JavaScript, C++, or Java\n* 📅 **Build customized active recall study schedules** for your courses & exams\n* 📝 **Generate diagnostic practice questions** to test your retention\n\nWhat topic or question would you like to explore today?`;
+    botReply = `👋 Hello **${studentName}**! Great to meet you!\n\nI am your **StudyPath AI Tutor & Academic Mentor**, powered by **Google Gemini**.\n\nI can help you with anything you need:\n* 💻 **Coding & Debugging** in Python, Java, C++, Rust, Go, JavaScript, SQL\n* 🧠 **Algorithms & Data Structures** (Trees, Graphs, DP, Sorting, Recursion)\n* 📚 **Academic Subjects & General Knowledge** (Math, Science, Engineering)\n* 📅 **Personalized Study Schedules & Exam Preparation**\n\nWhat would you like to explore or learn today?`;
   } else if (clean.includes('array') || clean.includes('list')) {
-    botReply = `### 📦 Comprehensive Guide: What is an Array?\n\nAn **array** is a foundational contiguous data structure that stores elements of the same data type in sequential, indexed memory locations.\n\n#### 🔑 Core Mechanical Characteristics:\n1. **$O(1)$ Constant Time Random Access**: Because elements are contiguous, memory calculation is direct:\n   $$\\text{Address}(arr[i]) = \\text{Base Address} + i \\times \\text{Element Size}$$\n2. **$O(N)$ Insertion / Deletion**: Inserting or deleting an element at arbitrary index $k$ requires shifting $N - k$ elements in memory.\n3. **Cache Locality**: Sequential memory layouts maximize CPU L1/L2 cache line hits, outperforming linked node structures in traversal speeds.\n\n\`\`\`python\n# Array / List Operations & Time Complexities in Python\nnumbers = [10, 20, 30, 40, 50]\n\n# 1. Instant Index Lookup: O(1)\nval = numbers[2]  # 30\n\n# 2. Append to end: Amortized O(1)\nnumbers.append(60)\n\n# 3. Insert at beginning: O(N) due to right-shift\nnumbers.insert(0, 5)\n\n# 4. Search element: O(N) linear scan (or O(log N) if sorted via binary search)\ndef find_element(arr, target):\n    for i, num in enumerate(arr):\n        if num == target:\n            return i\n    return -1\n\`\`\``;
+    botReply = `### 📦 Comprehensive Guide: What is an Array?\n\nAn **array** is a foundational contiguous data structure that stores elements in sequential, indexed memory locations.\n\n#### 🔑 Core Characteristics:\n1. **$O(1)$ Constant Time Index Access**: Address calculation is direct: ` + '`Address = Base + index * size`' + `\n2. **$O(N)$ Insertion / Deletion**: Modifying elements in the middle requires shifting trailing elements.\n3. **Cache Locality**: Sequential memory layouts maximize CPU L1/L2 cache hit rates.\n\n\`\`\`python\n# Array Operations in Python\nnumbers = [10, 20, 30, 40, 50]\nprint(numbers[2])  # 30 (O(1) access)\nnumbers.append(60) # Amortized O(1)\n\`\`\``;
   } else if (clean.includes('quicksort') || clean.includes('mergesort') || clean.includes('sort')) {
-    botReply = `### ⚡ QuickSort vs MergeSort: Deep Comparison\n\n| Algorithm | Best Time | Average Time | Worst Time | Space Complexity | Stable? | In-Place? |\n|---|---|---|---|---|---|---|\n| **QuickSort** | $O(N \\log N)$ | $O(N \\log N)$ | $O(N^2)$ (degenerate pivot) | $O(\\log N)$ | ❌ No | ✅ Yes |\n| **MergeSort** | $O(N \\log N)$ | $O(N \\log N)$ | $O(N \\log N)$ | $O(N)$ auxiliary | ✅ Yes | ❌ No |\n\n#### 💡 When to choose which?\n* **QuickSort**: Ideal for general in-memory primitive sorting with high CPU cache efficiency.\n* **MergeSort**: Essential when stability is required, or when sorting linked lists / external file streams.\n\n\`\`\`python\ndef quicksort(arr):\n    \"\"\"Divide & Conquer QuickSort with median pivot selection.\"\"\"\n    if len(arr) <= 1:\n        return arr\n    pivot = arr[len(arr) // 2]\n    left = [x for x in arr if x < pivot]\n    middle = [x for x in arr if x == pivot]\n    right = [x for x in arr if x > pivot]\n    return quicksort(left) + middle + quicksort(right)\n\`\`\``;
-  } else if (clean.includes('binary search')) {
-    botReply = `### 🔍 Binary Search ($O(\\log N)$ Time Complexity)\n\nBinary Search operates on a **sorted dataset** by repeatedly dividing the search space in half.\n\n\`\`\`python\ndef binary_search(arr, target):\n    \"\"\"Returns index of target in sorted arr, or -1 if absent.\"\"\"\n    left, right = 0, len(arr) - 1\n    \n    while left <= right:\n        # Avoid potential integer overflow: mid = left + (right - left) // 2\n        mid = left + (right - left) // 2\n        \n        if arr[mid] == target:\n            return mid\n        elif arr[mid] < target:\n            left = mid + 1\n        else:\n            right = mid - 1\n            \n    return -1\n\`\`\`\n\n> 💡 **Invariant**: At every step, if \`target\` exists in the array, it is guaranteed to lie within \`arr[left...right]\`.`;
-  } else if (clean.includes('sql') || clean.includes('database') || clean.includes('acid') || clean.includes('index')) {
-    botReply = `### 🗄️ Database Systems & SQL Optimization\n\n#### 1. ACID Guarantees:\n* **Atomicity**: All operations in a transaction commit together or roll back completely.\n* **Consistency**: DB transitions strictly from one valid schema state to another.\n* **Isolation**: Concurrent transactions execute without cross-contamination (Read Committed, Repeatable Read, Serializable).\n* **Durability**: Committed transactions persist permanently across power loss (WAL logging).\n\n#### 2. Advanced Query Optimization Example:\n\`\`\`sql\n-- Aggregating active student performance by department\nSELECT \n    d.department_name,\n    COUNT(s.student_id) AS total_students,\n    ROUND(AVG(s.gpa), 2) AS average_gpa,\n    MAX(s.gpa) AS highest_gpa\nFROM departments d\nINNER JOIN students s ON d.department_id = s.department_id\nWHERE s.enrollment_status = 'Active'\nGROUP BY d.department_name\nHAVING AVG(s.gpa) >= 3.2\nORDER BY average_gpa DESC;\n\`\`\`\n\n> 🚀 **Indexing Rule of Thumb**: Place composite B-Tree indexes on \`(department_id, enrollment_status)\` to enable efficient index-only scans.`;
-  } else if (clean.includes('machine learning') || clean.includes('neural') || clean.includes('bias') || clean.includes('variance') || clean.includes('gradient') || clean.includes('ai')) {
-    botReply = `### 🤖 Machine Learning: The Bias-Variance Tradeoff\n\nIn supervised machine learning, prediction error decomposes into:\n$$\\text{Total Error} = \\text{Bias}^2 + \\text{Variance} + \\text{Irreducible Error}$$\n\n#### ⚖️ Understanding the Balance:\n* **High Bias (Underfitting)**: Model makes overly simplistic assumptions (e.g., linear line on quadratic curve). **Remedy**: Increase model depth, add polynomial features, train longer.\n* **High Variance (Overfitting)**: Model memorizes training noise and fails to generalize to validation data. **Remedy**: L1/L2 Regularization (Weight Decay), Dropout, early stopping, cross-validation, data augmentation.\n\n\`\`\`python\n# Adding L2 Regularization (Ridge / Weight Decay) in Scikit-Learn\nfrom sklearn.linear_model import Ridge\nfrom sklearn.model_selection import train_test_split\n\nmodel = Ridge(alpha=1.0)  # alpha controls penalty on large weight magnitudes\nmodel.fit(X_train, y_train)\nprint(f"Validation Score: {model.score(X_val, y_val):.2f}")\n\`\`\``;
-  } else if (clean.includes('study') || clean.includes('schedule') || clean.includes('plan') || clean.includes('pomodoro') || clean.includes('recall')) {
-    botReply = `### 📅 Evidence-Based Active Recall & Spaced Repetition Protocol\n\nTo achieve **90%+ long-term retention**, follow this 4-step cognitive workflow for ${studentName}:\n\n1. **Priming (15 mins)**: Review core concepts and write down 3 key questions to answer.\n2. **Deep Retrieval Practice (45 mins)**: Solve coding problems or answer test questions with zero notes.\n3. **Feynman Technique (15 mins)**: Explain the concept aloud in simple terms as if teaching a beginner.\n4. **Consolidation Break (10 mins)**: Step away to allow memory consolidation.\n\n> 🧠 **Spaced Schedule**: Review this topic on **Day 1**, **Day 3**, **Day 7**, and **Day 21**!`;
+    botReply = `### ⚡ QuickSort vs MergeSort Comparison\n\n| Feature | QuickSort | MergeSort |\n|---|---|---|\n| **Average Time** | $O(N \\log N)$ | $O(N \\log N)$ |\n| **Worst Time** | $O(N^2)$ | $O(N \\log N)$ |\n| **Space Complexity** | $O(\\log N)$ in-place | $O(N)$ auxiliary |\n| **Stability** | Not stable | Stable |\n\n\`\`\`python\ndef quicksort(arr):\n    if len(arr) <= 1: return arr\n    pivot = arr[len(arr) // 2]\n    return quicksort([x for x in arr if x < pivot]) + [x for x in arr if x == pivot] + quicksort([x for x in arr if x > pivot])\n\`\`\``;
   } else {
-    botReply = `### 💡 StudyPath AI Tutor: Analysis & Solution\n\nHello **${studentName}**! Here is a structured breakdown to master this concept:\n\n1. **Core Concept**: Break the problem down into fundamental invariants and examine the input-output requirements.\n2. **Step-by-Step Implementation**: Implement a clean, modular solution with edge case guards.\n3. **Complexity & Tradeoffs**: Evaluate computational time complexity and memory overhead.\n\n\`\`\`python\n# Clean Python Implementation Pattern\ndef solution_pattern(data):\n    \"\"\"Modular implementation with O(N) linear complexity.\"\"\"\n    if not data:\n        return []\n    return [item for item in data if item is not None]\n\`\`\`\n\nFeel free to ask a followup question or request practice problems on this topic!`;
+    botReply = `### 💡 Analysis & Solution for: "${prompt}"\n\nHello **${studentName}**! Here is a structured explanation:\n\n1. **Overview**: Let's break down this topic systematically.\n2. **Key Concepts**: Focus on fundamental principles, rules, and best practices.\n3. **Practical Application**: Apply this knowledge step-by-step in your coursework or projects.\n\n*Feel free to ask a specific follow-up question or request code examples!*`;
   }
 
   return {
     response: botReply,
-    model: "studypath-gemini-engine",
+    model: "studypath-fallback-engine",
     status: "success",
     suggested_followups: generateContextualFollowups(prompt, botReply)
   };
 }
 
+/**
+ * Generate relevant follow-up prompt suggestions
+ */
 export function generateContextualFollowups(userMsg, botReply) {
   const combined = `${userMsg} ${botReply}`.toLowerCase();
 
@@ -113,41 +120,34 @@ export function generateContextualFollowups(userMsg, botReply) {
     return [
       'Explain QuickSort vs MergeSort with Python code',
       'How do database indexes speed up SQL queries?',
-      'Create a 45-minute study plan for machine learning'
+      'Create a 45-minute study plan for my exams'
     ];
   }
-  if (combined.includes('sort') || combined.includes('binary search') || combined.includes('algorithm') || combined.includes('tree') || combined.includes('graph')) {
+  if (combined.includes('sort') || combined.includes('binary search') || combined.includes('algorithm') || combined.includes('tree') || combined.includes('graph') || combined.includes('array')) {
     return [
       'Show the time and space complexity breakdown',
       'Give me 2 practice problems on this concept',
       'How does this compare to iterative vs recursive approaches?'
     ];
   }
-  if (combined.includes('sql') || combined.includes('database') || combined.includes('acid') || combined.includes('index')) {
+  if (combined.includes('sql') || combined.includes('database') || combined.includes('acid') || combined.includes('table')) {
     return [
       'Show an example SQL query with GROUP BY and HAVING',
       'Explain ACID properties with real-world examples',
-      'What is database normalization (1NF, 2NF, 3NF)?'
+      'What is database indexing and B-Trees?'
     ];
   }
-  if (combined.includes('machine learning') || combined.includes('neural') || combined.includes('gradient') || combined.includes('ai')) {
+  if (combined.includes('python') || combined.includes('java') || combined.includes('c++') || combined.includes('rust') || combined.includes('javascript')) {
     return [
-      'Explain the Bias-Variance tradeoff intuitively',
-      'What is the difference between Precision and Recall?',
-      'How does Gradient Descent optimize neural weights?'
-    ];
-  }
-  if (combined.includes('study') || combined.includes('exam') || combined.includes('plan') || combined.includes('pomodoro')) {
-    return [
-      'Break this down into a 45-minute Pomodoro study block',
-      'What are the best active recall techniques for retention?',
-      'Generate flashcard practice questions for this topic'
+      'Provide a complete, runnable code example',
+      'What are common edge cases and bugs here?',
+      'How do memory and pointers work in this language?'
     ];
   }
 
   return [
-    'Could you explain this with a practical analogy?',
-    'Provide a step-by-step example with code',
-    'What are the most common edge cases to watch out for?'
+    'Could you give a step-by-step example?',
+    'What are the key takeaways to remember?',
+    'Can you quiz me on this topic?'
   ];
 }
