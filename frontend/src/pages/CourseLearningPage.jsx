@@ -34,7 +34,7 @@ const CourseLearningPage = () => {
   const [loading, setLoading] = useState(true);
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [activeLessonIndex, setActiveLessonIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState('resources'); // overview, resources, code, transcript
+  const [activeTab, setActiveTab] = useState('resources'); // resources, overview, code, transcript
   const [completedLessons, setCompletedLessons] = useState({});
   const [progress, setProgress] = useState(0);
   const [quizzes, setQuizzes] = useState([]);
@@ -59,11 +59,20 @@ const CourseLearningPage = () => {
         const matchedQuizzes = quizzesRes.data.filter((q) => q.course_id === parseInt(id));
         setQuizzes(matchedQuizzes.length > 0 ? matchedQuizzes : quizzesRes.data.slice(0, 1));
 
-        // Set default active video from course free resources or curated video
+        // Set initial video from the first lesson or course resources
+        const firstLesson = courseData.syllabus?.[0]?.lessons?.[0];
         const firstVideoResource = courseData.free_resources?.find(
           (r) => r.type === 'youtube' || r.type === 'course' || (r.url && r.url.includes('youtube.com'))
         );
-        if (firstVideoResource) {
+
+        if (firstLesson?.video_url) {
+          setActiveVideo({
+            title: `${firstLesson.title} - ${courseData.title}`,
+            url: firstLesson.video_url,
+            author: firstLesson.author || courseData.author || 'Course Instructor',
+            description: firstLesson.description || courseData.description
+          });
+        } else if (firstVideoResource) {
           setActiveVideo({
             title: firstVideoResource.title,
             url: firstVideoResource.url,
@@ -72,7 +81,7 @@ const CourseLearningPage = () => {
           });
         } else {
           setActiveVideo({
-            title: `${courseData.title} - Foundation Lecture`,
+            title: `${courseData.title} - Full Lecture`,
             url: 'https://www.youtube.com/watch?v=rfscVS0vtbw',
             author: 'StudyPath Verified',
             description: courseData.description
@@ -91,6 +100,28 @@ const CourseLearningPage = () => {
     };
     fetchCourseData();
   }, [id]);
+
+  const handleSelectLesson = (modIdx, lesIdx) => {
+    setActiveModuleIndex(modIdx);
+    setActiveLessonIndex(lesIdx);
+
+    const mod = course?.syllabus?.[modIdx];
+    const les = mod?.lessons?.[lesIdx];
+    if (les && course) {
+      const videoUrl = les.video_url || 
+        course.free_resources?.find(r => r.type === 'youtube' || (r.url && r.url.includes('youtube.com')))?.url || 
+        'https://www.youtube.com/watch?v=rfscVS0vtbw';
+
+      setActiveVideo({
+        title: `${les.title} (${course.course_name || course.title})`,
+        url: videoUrl,
+        author: les.author || course.author || 'Course Instructor',
+        description: les.description || `Lecture and walkthrough on ${les.title}.`
+      });
+      // Scroll smoothly to player
+      window.scrollTo({ top: 80, behavior: 'smooth' });
+    }
+  };
 
   const handleLessonToggle = async (modIdx, lesIdx) => {
     const key = `${modIdx}-${lesIdx}`;
@@ -125,8 +156,7 @@ const CourseLearningPage = () => {
       author: resource.author || resource.provider || 'Instructor',
       description: resource.description
     });
-    // Scroll smoothly to the player
-    window.scrollTo({ top: 120, behavior: 'smooth' });
+    window.scrollTo({ top: 80, behavior: 'smooth' });
   };
 
   if (loading) {
@@ -163,10 +193,11 @@ const CourseLearningPage = () => {
   };
   const currentQuiz = quizzes[0];
 
-  const embedUrl = getYouTubeEmbedUrl(activeVideo?.url || 'https://www.youtube.com/watch?v=rfscVS0vtbw', activeVideo?.title || course.title);
+  const videoUrlToPlay = activeVideo?.url || course.free_resources?.find(r => r.type === 'youtube')?.url || 'https://www.youtube.com/watch?v=rfscVS0vtbw';
+  const embedUrl = getYouTubeEmbedUrl(videoUrlToPlay, activeVideo?.title || currentLesson.title || course.title);
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 select-none">
       {/* Course Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -182,9 +213,10 @@ const CourseLearningPage = () => {
             <div className="flex items-center gap-2">
               <Badge variant="indigo" size="sm">{course.category}</Badge>
               <Badge variant="slate" size="sm">{course.difficulty}</Badge>
+              {course.language && <Badge variant="purple" size="sm">{course.language}</Badge>}
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-1">
-              {course.title}
+              {course.title || course.course_name}
             </h1>
           </div>
         </div>
@@ -211,25 +243,37 @@ const CourseLearningPage = () => {
           <GlassCard className="overflow-hidden">
             
             {/* Player Top Status Bar */}
-            <div className="p-3 bg-amber-100/70 border-b border-amber-200/80 flex items-center justify-between gap-3 text-xs">
+            <div className="p-3 bg-amber-100/80 border-b border-amber-200/80 flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-red-600 text-white font-black text-[10px]">
                   <Play className="w-3 h-3 fill-current" />
-                  Streaming in App
+                  Playing
                 </span>
-                <span className="font-bold text-stone-900 truncate">
+                <span className="font-extrabold text-stone-950 truncate">
                   {activeVideo?.title || currentLesson.title}
                 </span>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={videoUrlToPlay}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                  title="Open video directly on YouTube"
+                >
+                  <YouTubeIcon className="w-3.5 h-3.5" />
+                  <span>Open on YouTube</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+
                 <button
                   type="button"
-                  onClick={() => setTheaterModalVideo(activeVideo)}
+                  onClick={() => setTheaterModalVideo(activeVideo || { title: currentLesson.title, url: videoUrlToPlay })}
                   className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 hover:bg-amber-50 text-stone-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
                 >
                   <Maximize2 className="w-3 h-3" />
-                  <span>Theater Modal</span>
+                  <span>Theater</span>
                 </button>
               </div>
             </div>
@@ -237,6 +281,7 @@ const CourseLearningPage = () => {
             {/* Real Working YouTube Iframe Player */}
             <div className="relative aspect-video w-full bg-stone-950">
               <iframe
+                key={embedUrl}
                 src={embedUrl}
                 title={activeVideo?.title || currentLesson.title || 'Course Lecture Video'}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -246,22 +291,24 @@ const CourseLearningPage = () => {
             </div>
 
             {/* Lesson Navigation & Completion Bar */}
-            <div className="p-4 bg-amber-50/50 flex items-center justify-between gap-3 border-t border-amber-200/50">
-              <button
-                onClick={() => handleLessonToggle(activeModuleIndex, activeLessonIndex)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                  completedLessons[`${activeModuleIndex}-${activeLessonIndex}`]
-                    ? 'bg-emerald-500/20 text-emerald-800 border-emerald-500/40 font-bold'
-                    : 'bg-white text-stone-800 border-stone-300 hover:text-amber-800 shadow-sm'
-                }`}
-              >
-                <CheckCircle2 className={`w-4 h-4 ${completedLessons[`${activeModuleIndex}-${activeLessonIndex}`] ? 'text-emerald-600 fill-emerald-100' : 'text-stone-400'}`} />
-                <span>
-                  {completedLessons[`${activeModuleIndex}-${activeLessonIndex}`]
-                    ? 'Lesson Completed'
-                    : 'Mark as Completed'}
-                </span>
-              </button>
+            <div className="p-4 bg-amber-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-amber-200/50">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleLessonToggle(activeModuleIndex, activeLessonIndex)}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                    completedLessons[`${activeModuleIndex}-${activeLessonIndex}`]
+                      ? 'bg-emerald-500/20 text-emerald-800 border-emerald-500/40 font-bold'
+                      : 'bg-white text-stone-800 border-stone-300 hover:text-amber-800 shadow-sm'
+                  }`}
+                >
+                  <CheckCircle2 className={`w-4 h-4 ${completedLessons[`${activeModuleIndex}-${activeLessonIndex}`] ? 'text-emerald-600 fill-emerald-100' : 'text-stone-400'}`} />
+                  <span>
+                    {completedLessons[`${activeModuleIndex}-${activeLessonIndex}`]
+                      ? 'Lesson Completed'
+                      : 'Mark as Completed'}
+                  </span>
+                </button>
+              </div>
 
               {/* Direct Quiz Trigger */}
               {currentQuiz && (
@@ -271,7 +318,7 @@ const CourseLearningPage = () => {
                   icon={HelpCircle}
                   onClick={() => navigate(`/quiz/${currentQuiz.id}`)}
                 >
-                  Take Module Quiz
+                  Take Module Quiz ({currentQuiz.total_questions || 5} Questions)
                 </Button>
               )}
             </div>
@@ -281,17 +328,17 @@ const CourseLearningPage = () => {
           <GlassCard className="p-5 space-y-4">
             <div className="flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-3 overflow-x-auto">
               {[
-                { id: 'resources', label: 'Free Channels & Websites', icon: YouTubeIcon },
-                { id: 'overview', label: 'Lesson Notes', icon: FileText },
+                { id: 'resources', label: 'Free YouTube Courses & Links', icon: YouTubeIcon },
+                { id: 'overview', label: 'Lesson Notes & Guide', icon: FileText },
                 { id: 'code', label: 'Interactive Sandbox', icon: Code },
-                { id: 'transcript', label: 'Summary & Key Concepts', icon: BookOpen },
+                { id: 'transcript', label: 'Key Objectives', icon: BookOpen },
               ].map((tab) => {
                 const Icon = tab.icon;
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                       activeTab === tab.id
                         ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
@@ -320,10 +367,10 @@ const CourseLearningPage = () => {
                       </div>
                       <div>
                         <p className="font-bold text-stone-950 text-xs">
-                          Verified Course Video Playlists & Resources
+                          Verified Course Video Playlists & Free Tutorials
                         </p>
                         <p className="text-[11px] text-stone-600 font-medium">
-                          Click "Watch in StudyPath" on any video to stream it directly in the player above.
+                          Click any resource to stream it directly in the player above or open in YouTube.
                         </p>
                       </div>
                     </div>
@@ -332,7 +379,7 @@ const CourseLearningPage = () => {
                   <FreeResourcesGrid
                     resources={course.free_resources || []}
                     title="Course Video Playlists & Web Portals"
-                    description={`Direct links to verified external material for ${course.title}`}
+                    description={`Direct links to verified material for ${course.title || course.course_name}`}
                     onPlayVideo={handleSelectVideoResource}
                   />
                 </div>
@@ -343,8 +390,8 @@ const CourseLearningPage = () => {
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white">{currentLesson.title}</h4>
                   <p>{currentLesson.content || course.description}</p>
                   <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-stone-900">
-                    <span className="font-bold text-stone-950 block mb-1">💡 Study Recommendation Tip:</span>
-                    For maximum retention, stream the curated video lectures in the "Free Channels & Websites" tab and test yourself on the Module Quiz.
+                    <span className="font-bold text-stone-950 block mb-1">💡 Study Recommendation:</span>
+                    Watch the lecture in the player above, write down your key takeaways, and test your understanding with the diagnostic quiz.
                   </div>
                 </div>
               )}
@@ -354,7 +401,7 @@ const CourseLearningPage = () => {
                   <div className="p-4 rounded-xl bg-stone-950 font-mono text-xs text-emerald-400 border border-stone-800 overflow-x-auto">
                     <p className="text-stone-500"># StudyPath Sandbox - {currentLesson.title}</p>
                     <p>def solve_problem(dataset):</p>
-                    <p className="pl-4"># Apply algorithmic pattern learned in video</p>
+                    <p className="pl-4"># Core algorithmic implementation</p>
                     <p className="pl-4">result = [x * 2 for x in dataset if x &gt; 0]</p>
                     <p className="pl-4">return result</p>
                     <p className="text-amber-400 mt-2">print(solve_problem([1, -2, 3, 4])) # Output: [2, 6, 8]</p>
@@ -366,9 +413,9 @@ const CourseLearningPage = () => {
                 <div className="space-y-2">
                   <p className="font-semibold text-slate-900 dark:text-white">Core Learning Objectives:</p>
                   <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
-                    <li>Mastering fundamental data invariants and complexity bounds.</li>
-                    <li>Understanding edge cases and memory layout trade-offs.</li>
-                    <li>Applying structured testing and debugging methodologies.</li>
+                    <li>Mastering fundamental language syntax and data types.</li>
+                    <li>Understanding memory allocation and execution models.</li>
+                    <li>Applying clean coding principles and modular architecture.</li>
                   </ul>
                 </div>
               )}
@@ -385,6 +432,9 @@ const CourseLearningPage = () => {
                 {course.syllabus?.length || 0} Modules
               </span>
             </h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Click any lesson below to immediately load and stream its lecture video in the player.
+            </p>
 
             <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
               {course.syllabus?.map((mod, mIdx) => (
@@ -413,10 +463,8 @@ const CourseLearningPage = () => {
                       return (
                         <button
                           key={lIdx}
-                          onClick={() => {
-                            setActiveModuleIndex(mIdx);
-                            setActiveLessonIndex(lIdx);
-                          }}
+                          type="button"
+                          onClick={() => handleSelectLesson(mIdx, lIdx)}
                           className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
                             isSelected
                               ? 'bg-indigo-600 text-white font-bold shadow-xs'
@@ -431,7 +479,7 @@ const CourseLearningPage = () => {
                             )}
                             <span className="truncate">{lesson.title}</span>
                           </div>
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 ml-2">
+                          <span className={`text-[10px] shrink-0 ml-2 ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
                             {lesson.duration}
                           </span>
                         </button>
@@ -449,17 +497,17 @@ const CourseLearningPage = () => {
                   <HelpCircle className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
                   <span>Module Diagnostic Quiz</span>
                 </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium">
                   Passing this quiz updates your adaptive learning profile and refreshes future course recommendations.
                 </p>
                 <Button
                   size="sm"
                   variant="primary"
-                  className="w-full"
+                  className="w-full font-bold"
                   icon={Play}
                   onClick={() => navigate(`/quiz/${currentQuiz.id}`)}
                 >
-                  Start Timed Quiz ({currentQuiz.time_limit_minutes}m)
+                  Start Timed Quiz ({currentQuiz.time_limit_minutes || 10}m)
                 </Button>
               </div>
             )}

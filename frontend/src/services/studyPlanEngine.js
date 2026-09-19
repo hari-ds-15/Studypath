@@ -17,7 +17,7 @@ export const DEFAULT_PROFILE = {
   preferred_duration: "Medium (4-7 weeks)",
   daily_study_hours: 3.0,
   average_study_hours: 3.0,
-  weekly_target_hours: 21,
+  weekly_target_hours: 21.0,
   learning_speed: "Balanced",
   preferred_content_type: "Interactive & Practice",
   strong_subjects: ["Python Programming", "Machine Learning Fundamentals"],
@@ -38,9 +38,20 @@ export function getStoredProfile() {
       const parsed = JSON.parse(saved);
       const user = localStorage.getItem('studypath_user');
       const userObj = user ? JSON.parse(user) : null;
+      
+      const daily = parsed.daily_study_hours !== undefined 
+        ? parseFloat(parsed.daily_study_hours) 
+        : (parsed.average_study_hours !== undefined ? parseFloat(parsed.average_study_hours) : 3.0);
+      const weekly = parsed.weekly_target_hours !== undefined 
+        ? parseFloat(parsed.weekly_target_hours) 
+        : Math.round(daily * 7 * 10) / 10;
+
       return {
         ...DEFAULT_PROFILE,
         ...parsed,
+        daily_study_hours: daily,
+        average_study_hours: daily,
+        weekly_target_hours: weekly,
         full_name: userObj?.full_name || parsed.full_name || 'StudyPath Student',
         email: userObj?.email || parsed.email || 'student@studypath.edu'
       };
@@ -59,23 +70,20 @@ export function getStoredProfile() {
 }
 
 /**
- * Save updated profile to localStorage and sync mathematical hours consistency
+ * Save updated profile to localStorage and mathematically synchronize daily & weekly hours
  */
 export function saveStoredProfile(updatedFields) {
   const current = getStoredProfile();
 
-  // Synchronize daily and weekly study targets logically
-  let dailyHours = updatedFields.daily_study_hours !== undefined 
-    ? parseFloat(updatedFields.daily_study_hours) 
-    : (updatedFields.average_study_hours !== undefined ? parseFloat(updatedFields.average_study_hours) : current.daily_study_hours || 3.0);
+  let dailyHours = current.daily_study_hours || 3.0;
+  let weeklyHours = current.weekly_target_hours || 21.0;
 
-  let weeklyHours = updatedFields.weekly_target_hours !== undefined 
-    ? parseFloat(updatedFields.weekly_target_hours) 
-    : current.weekly_target_hours;
-
-  if (updatedFields.daily_study_hours !== undefined && updatedFields.weekly_target_hours === undefined) {
+  if (updatedFields.daily_study_hours !== undefined || updatedFields.average_study_hours !== undefined) {
+    const rawDaily = updatedFields.daily_study_hours !== undefined ? updatedFields.daily_study_hours : updatedFields.average_study_hours;
+    dailyHours = Math.max(0.5, Math.min(16, parseFloat(rawDaily) || 3.0));
     weeklyHours = Math.round(dailyHours * 7 * 10) / 10;
-  } else if (updatedFields.weekly_target_hours !== undefined && updatedFields.daily_study_hours === undefined) {
+  } else if (updatedFields.weekly_target_hours !== undefined) {
+    weeklyHours = Math.max(3.5, Math.min(112, parseFloat(updatedFields.weekly_target_hours) || 21.0));
     dailyHours = Math.round((weeklyHours / 7) * 10) / 10;
   }
 
@@ -105,6 +113,19 @@ export function saveStoredProfile(updatedFields) {
   return merged;
 }
 
+// Helper to format minutes into HH:MM time string
+function formatTimeString(startHour, startMin, addMinutes) {
+  const totalStartMinutes = startHour * 60 + startMin;
+  const totalEndMinutes = totalStartMinutes + addMinutes;
+  
+  const sh = String(Math.floor(totalStartMinutes / 60) % 24).padStart(2, '0');
+  const sm = String(totalStartMinutes % 60).padStart(2, '0');
+  const eh = String(Math.floor(totalEndMinutes / 60) % 24).padStart(2, '0');
+  const em = String(totalEndMinutes % 60).padStart(2, '0');
+
+  return { start: `${sh}:${sm}`, end: `${eh}:${em}` };
+}
+
 /**
  * Generate a 7-day AI study plan tailored specifically to profile language, weak subjects, speed, and target hours.
  */
@@ -113,7 +134,9 @@ export function generateAiStudyPlan(profile = null) {
   const lang = p.selected_language || "Python";
   const stream = p.career_stream || "AI Engineer";
   const level = p.skill_level || "Beginner";
-  
+  const dailyTargetHours = p.daily_study_hours || p.average_study_hours || 3.0;
+  const totalDailyMinutes = Math.round(dailyTargetHours * 60);
+
   const weakSubjects = (p.weak_subjects && p.weak_subjects.length > 0)
     ? p.weak_subjects
     : [`${lang} Data Structures`, "Database Systems & SQL"];
@@ -126,148 +149,142 @@ export function generateAiStudyPlan(profile = null) {
   const strong1 = strongSubjects[0] || `${lang} Programming`;
 
   const scheduleTemplates = [
-    // Monday: Language Fundamentals & Core Sandbox
+    // Monday: Language Fundamentals & Core Sandbox (2 sessions)
     {
       day: "Monday",
-      sessions: [
+      startBase: { hour: 18, min: 0 },
+      sessionsMeta: [
         {
           title: `Deep Dive: ${lang} (${level}) - ${weak1}`,
           subject_name: `${lang} Syntax & Logic`,
-          start_time: "18:00",
-          end_time: "19:30",
           session_type: "Video",
+          weight: 0.55,
           notes: `Follow step-by-step tutorial on ${lang} core principles and trace memory execution.`
         },
         {
           title: `${lang} Interactive Practice & Problem Solving`,
           subject_name: `${lang} Practice`,
-          start_time: "19:45",
-          end_time: "21:00",
           session_type: "Practice",
-          notes: `Implement 2 hands-on ${lang} coding exercises with zero reference materials.`
+          weight: 0.45,
+          notes: `Implement hands-on ${lang} coding exercises with zero reference materials.`
         }
       ]
     },
-    // Tuesday: Weak Subject #2 & Knowledge Testing Checkpoint
+    // Tuesday: Weak Subject #2 & Knowledge Testing Checkpoint (2 sessions)
     {
       day: "Tuesday",
-      sessions: [
+      startBase: { hour: 18, min: 0 },
+      sessionsMeta: [
         {
           title: `Applied Practice: ${weak2}`,
           subject_name: weak2,
-          start_time: "18:00",
-          end_time: "19:15",
           session_type: "Practice",
+          weight: 0.55,
           notes: "Focus on optimization patterns, data flow, and practical problem implementation."
         },
         {
           title: `Knowledge Testing: ${lang} Diagnostic Checkpoint`,
           subject_name: `${lang} Assessment`,
-          start_time: "19:30",
-          end_time: "20:30",
           session_type: "Quiz",
+          weight: 0.45,
           notes: `Take dynamic Knowledge Testing quiz in ${lang} to verify conceptual retention.`
         }
       ]
     },
-    // Wednesday: Strong Subject Reinforcement & Active Recall
+    // Wednesday: Strong Subject Reinforcement & Active Recall (2 sessions)
     {
       day: "Wednesday",
-      sessions: [
+      startBase: { hour: 18, min: 0 },
+      sessionsMeta: [
         {
           title: `Advanced ${strong1} & Architecture`,
           subject_name: strong1,
-          start_time: "18:00",
-          end_time: "19:30",
           session_type: "Video",
+          weight: 0.6,
           notes: `Leverage strong foundation to tackle real-world system design and ${stream} patterns.`
         },
         {
           title: `Spaced Revision: ${weak1}`,
           subject_name: weak1,
-          start_time: "19:45",
-          end_time: "20:45",
           session_type: "Revision",
-          notes: "Feynman technique: explain Monday's concepts from memory without looking at notes."
+          weight: 0.4,
+          notes: "Feynman technique: explain core concepts from memory without looking at notes."
         }
       ]
     },
-    // Thursday: Intensive Problem Solving on Priority Focus
+    // Thursday: Intensive Problem Solving on Priority Focus (1 deep work session)
     {
       day: "Thursday",
-      sessions: [
+      startBase: { hour: 18, min: 0 },
+      sessionsMeta: [
         {
           title: `Challenging Problem Sets: ${weak1} in ${lang}`,
           subject_name: `${lang} Problem Solving`,
-          start_time: "18:00",
-          end_time: "20:00",
           session_type: "Practice",
+          weight: 1.0,
           notes: "Analyze edge cases, time complexity, and memory invariants."
         }
       ]
     },
-    // Friday: Specialization Track Lab & Weekly Assessment
+    // Friday: Specialization Track Lab & Weekly Assessment (2 sessions)
     {
       day: "Friday",
-      sessions: [
+      startBase: { hour: 17, min: 30 },
+      sessionsMeta: [
         {
           title: `Specialization Track Lab: ${stream}`,
           subject_name: stream,
-          start_time: "17:30",
-          end_time: "19:00",
           session_type: "Practice",
+          weight: 0.6,
           notes: `Build end-to-end module connecting ${lang} components to the ${stream} roadmap project.`
         },
         {
           title: `Weekly Knowledge Testing Assessment`,
           subject_name: "Weekly Review",
-          start_time: "19:15",
-          end_time: "20:30",
           session_type: "Quiz",
+          weight: 0.4,
           notes: `Evaluate retention on all ${lang} and ${stream} topics covered this week.`
         }
       ]
     },
-    // Saturday: Intensive Deep Work Block
+    // Saturday: Intensive Deep Work Block (2 weekend deep work sessions)
     {
       day: "Saturday",
-      sessions: [
+      startBase: { hour: 10, min: 0 },
+      sessionsMeta: [
         {
           title: `Weekend Deep Work: ${weak2} & Systems Engineering`,
           subject_name: weak2,
-          start_time: "10:00",
-          end_time: "12:00",
           session_type: "Video",
+          weight: 0.5,
           notes: "In-depth architecture breakdown, schema design, and runtime profiling."
         },
         {
           title: `Hands-on Project Lab: ${stream} Prototype`,
           subject_name: stream,
-          start_time: "14:00",
-          end_time: "16:00",
           session_type: "Practice",
+          weight: 0.5,
           notes: `Write clean, well-tested code in ${lang} and push commit to version control.`
         }
       ]
     },
-    // Sunday: Spaced Repetition & Next Week Roadmap
+    // Sunday: Spaced Repetition & Next Week Roadmap (2 sessions)
     {
       day: "Sunday",
-      sessions: [
+      startBase: { hour: 11, min: 0 },
+      sessionsMeta: [
         {
           title: `Weekly Spaced Repetition & Flashcard Review`,
           subject_name: "Spaced Repetition",
-          start_time: "11:00",
-          end_time: "12:30",
           session_type: "Revision",
+          weight: 0.6,
           notes: `Revisit error logs, missed quiz questions, and tricky ${lang} syntax traps.`
         },
         {
           title: `Next Week Roadmap & Goal Calibration`,
           subject_name: "Academic Strategy",
-          start_time: "17:00",
-          end_time: "18:00",
           session_type: "Reading",
+          weight: 0.4,
           notes: `Review analytics efficiency score and recalibrate next week's ${stream} milestones.`
         }
       ]
@@ -277,27 +294,41 @@ export function generateAiStudyPlan(profile = null) {
   let idCounter = 1;
   const sessions = [];
 
-  for (const item of scheduleTemplates) {
-    for (const s of item.sessions) {
-      const sh = parseInt(s.start_time.split(':')[0], 10);
-      const sm = parseInt(s.start_time.split(':')[1], 10);
-      const eh = parseInt(s.end_time.split(':')[0], 10);
-      const em = parseInt(s.end_time.split(':')[1], 10);
-      const duration = (eh * 60 + em) - (sh * 60 + sm);
+  for (const dayItem of scheduleTemplates) {
+    let currentHour = dayItem.startBase.hour;
+    let currentMin = dayItem.startBase.min;
+
+    let remainingMinutes = totalDailyMinutes;
+
+    dayItem.sessionsMeta.forEach((meta, idx) => {
+      let sessionDuration = 0;
+      if (idx === dayItem.sessionsMeta.length - 1) {
+        sessionDuration = Math.max(20, remainingMinutes);
+      } else {
+        sessionDuration = Math.max(20, Math.round(totalDailyMinutes * meta.weight));
+        remainingMinutes -= sessionDuration;
+      }
+
+      const times = formatTimeString(currentHour, currentMin, sessionDuration);
 
       sessions.push({
         id: idCounter++,
-        title: s.title,
-        subject_name: s.subject_name,
-        day_of_week: item.day,
-        start_time: s.start_time,
-        end_time: s.end_time,
-        duration_minutes: duration > 0 ? duration : 60,
-        session_type: s.session_type,
+        title: meta.title,
+        subject_name: meta.subject_name,
+        day_of_week: dayItem.day,
+        start_time: times.start,
+        end_time: times.end,
+        duration_minutes: sessionDuration,
+        session_type: meta.session_type,
         is_completed: false,
-        notes: s.notes
+        notes: meta.notes
       });
-    }
+
+      // Break between sessions (15 min)
+      const nextTotalMin = currentHour * 60 + currentMin + sessionDuration + 15;
+      currentHour = Math.floor(nextTotalMin / 60) % 24;
+      currentMin = nextTotalMin % 60;
+    });
   }
 
   saveStoredSessions(sessions);
@@ -342,7 +373,7 @@ export function saveStoredSessions(sessions) {
 export function computeWeeklyPlan(sessions = null, profile = null) {
   const currentSessions = sessions || getStoredSessions();
   const p = profile || getStoredProfile();
-  const targetHours = p.weekly_target_hours || 21;
+  const targetHours = p.weekly_target_hours || 21.0;
 
   const totalMinutes = currentSessions.reduce((acc, s) => acc + (s.duration_minutes || 60), 0);
   const totalHours = Math.round((totalMinutes / 60) * 10) / 10;

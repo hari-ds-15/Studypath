@@ -33,7 +33,7 @@ import Button from '../components/common/Button';
 import Badge from '../components/common/Badge';
 import Modal from '../components/common/Modal';
 import FreeResourcesGrid, { YouTubeIcon } from '../components/common/FreeResourcesGrid';
-import { CAREER_ROADMAPS } from '../data/careerRoadmapsData';
+import { CAREER_ROADMAPS, getCareerRoadmap } from '../data/careerRoadmapsData';
 
 const CATEGORIES = ['All', 'Core CS', 'AI & ML', 'Data Science', 'Web Development', 'Systems & Low-Level', 'Cloud & DevOps', 'Cybersecurity'];
 const DIFFICULTIES = ['All', 'Beginner', 'Intermediate', 'Advanced'];
@@ -100,8 +100,14 @@ const RecommendationsPage = () => {
       if (profileRes.status === 'fulfilled') {
         const p = profileRes.value.data;
         setProfile(p);
-        if (p?.career_stream && CAREER_ROADMAPS[p.career_stream]) {
-          setSelectedStreamKey(p.career_stream);
+        if (p?.career_stream) {
+          if (CAREER_ROADMAPS[p.career_stream]) {
+            setSelectedStreamKey(p.career_stream);
+          } else {
+            const mapped = getCareerRoadmap(p.career_stream);
+            const foundKey = Object.keys(CAREER_ROADMAPS).find((k) => CAREER_ROADMAPS[k].title === mapped.title);
+            if (foundKey) setSelectedStreamKey(foundKey);
+          }
         }
         const hasCustomData = p?.onboarding_completed || (p?.strong_subjects && p.strong_subjects.length > 0);
         setIsCalibrated(Boolean(hasCustomData));
@@ -211,7 +217,7 @@ const RecommendationsPage = () => {
       return 0;
     });
 
-  const currentRoadmap = CAREER_ROADMAPS[selectedStreamKey] || CAREER_ROADMAPS['AI Engineer'];
+  const currentRoadmap = CAREER_ROADMAPS[selectedStreamKey] || getCareerRoadmap(selectedStreamKey) || CAREER_ROADMAPS['AI Engineer'];
 
   return (
     <div className="space-y-6 select-none">
@@ -586,40 +592,44 @@ const RecommendationsPage = () => {
             {/* Stream Overview Card */}
             <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-extrabold text-indigo-950 dark:text-white">{currentRoadmap.stream}</span>
-                  <Badge variant="purple" size="sm">{currentRoadmap.total_duration}</Badge>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-extrabold text-indigo-950 dark:text-white">{currentRoadmap.title}</span>
+                  <Badge variant="purple" size="sm">{currentRoadmap.estimated_time}</Badge>
+                  {currentRoadmap.badge && (
+                    <Badge variant="amber" size="sm">{currentRoadmap.badge}</Badge>
+                  )}
                 </div>
                 <p className="text-xs text-indigo-900 dark:text-indigo-200 mt-1 font-medium">{currentRoadmap.description}</p>
                 <div className="mt-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Target Role: <span className="font-bold text-indigo-700 dark:text-indigo-300">{currentRoadmap.target_role}</span>
+                  Target Outcome: <span className="font-bold text-indigo-700 dark:text-indigo-300">{currentRoadmap.end_of_roadmap_milestone}</span>
                 </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 text-xs shrink-0 space-y-1">
-                <span className="font-bold text-slate-900 dark:text-white block">Readiness Milestones:</span>
-                {currentRoadmap.readiness_checklist?.slice(0, 3).map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-400">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>{item}</span>
-                  </div>
-                ))}
               </div>
             </div>
           </GlassCard>
 
-          {/* 4 Stages Progression */}
+          {/* Stages Progression (Beginner -> Intermediate -> Advanced) */}
           <div className="space-y-6">
-            {currentRoadmap.stages?.map((stage, idx) => (
-              <GlassCard key={stage.stage} className="p-6 space-y-4" hover>
+            {currentRoadmap.stages?.map((stage) => (
+              <GlassCard key={stage.stage_number} className="p-6 space-y-4" hover>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-md">
-                      {stage.stage}
+                    <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-md shrink-0">
+                      {stage.stage_number}
                     </div>
                     <div>
-                      <h4 className="text-base font-extrabold text-slate-900 dark:text-white">{stage.title}</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">{stage.focus}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-base font-extrabold text-slate-900 dark:text-white">{stage.title}</h4>
+                        <span className={`px-2 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider ${
+                          stage.level === 'Beginner'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                            : stage.level === 'Intermediate'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                            : 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-300 dark:border-purple-700'
+                        }`}>
+                          {stage.level}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{stage.goal}</p>
                     </div>
                   </div>
                   <Badge variant="indigo" size="sm">{stage.duration}</Badge>
@@ -632,7 +642,7 @@ const RecommendationsPage = () => {
                       Topics & Competencies
                     </h5>
                     <div className="flex flex-wrap gap-1.5">
-                      {stage.topics?.map((topic, tIdx) => (
+                      {stage.what_to_learn?.map((topic, tIdx) => (
                         <span key={tIdx} className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700">
                           {topic}
                         </span>
@@ -645,16 +655,32 @@ const RecommendationsPage = () => {
                     <span className="text-[10px] font-black uppercase text-amber-800 dark:text-amber-300 flex items-center gap-1">
                       <Code className="w-3.5 h-3.5" /> Hands-On Project Milestone
                     </span>
-                    <p className="text-xs font-bold text-stone-950 dark:text-white">{stage.project}</p>
+                    <p className="text-xs font-bold text-stone-950 dark:text-white">{stage.milestone_project?.title}</p>
+                    <p className="text-[11px] text-stone-700 dark:text-stone-300 mt-0.5">{stage.milestone_project?.description}</p>
                   </div>
                 </div>
+
+                {/* Readiness checklist */}
+                {stage.readiness_checklist?.length > 0 && (
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-1">
+                    <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Stage Exit Readiness Checklist:</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                      {stage.readiness_checklist.map((item, cIdx) => (
+                        <div key={cIdx} className="flex items-center gap-1.5 text-[11px] text-slate-700 dark:text-slate-300 font-medium">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Curated Free Resources for this Stage */}
                 {stage.free_resources?.length > 0 && (
                   <div className="pt-2">
                     <FreeResourcesGrid
                       resources={stage.free_resources}
-                      title={`Curated Free Learning Resources (Stage ${stage.stage})`}
+                      title={`Curated Free Learning Resources (Stage ${stage.stage_number}: ${stage.level})`}
                       description="Official documentation, full-length video courses, and hands-on interactive guides."
                     />
                   </div>

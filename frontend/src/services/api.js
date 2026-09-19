@@ -229,9 +229,23 @@ export const handleLocalRoute = async (config) => {
 
   // 6. Analytics
   if (url.includes('/analytics')) {
+    const dailyTarget = Number(profile.daily_study_hours) || (profile.weekly_target_hours ? Number(profile.weekly_target_hours) / 7 : 3.0);
+    const roundedDaily = Math.round(dailyTarget * 10) / 10;
+    const weeklyTarget = Number(profile.weekly_target_hours) || Math.round(dailyTarget * 7 * 10) / 10;
+
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const factors = [1.05, 0.92, 1.15, 0.88, 1.1, 1.25, 0.95];
+    const trend = days.map((d, i) => ({
+      day: d,
+      hours: Math.round(dailyTarget * factors[i] * 10) / 10,
+      target: roundedDaily
+    }));
+
     const analyticsData = {
       ...FALLBACK_ANALYTICS,
-      target_study_hours: profile.weekly_target_hours || 21.0,
+      total_study_hours: Math.round(trend.reduce((acc, curr) => acc + curr.hours, 0) * 10) / 10,
+      target_study_hours: weeklyTarget,
+      study_hours_trend: trend,
       learning_efficiency_score: profile.learning_efficiency_score || 84.5,
       strong_subjects: profile.strong_subjects?.length ? profile.strong_subjects : FALLBACK_ANALYTICS.strong_subjects,
       weak_subjects: profile.weak_subjects?.length ? profile.weak_subjects : FALLBACK_ANALYTICS.weak_subjects,
