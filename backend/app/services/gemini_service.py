@@ -1,29 +1,25 @@
 import re
+import time
 import logging
 from typing import Optional, List, Dict, Any
-from google import genai
+import requests
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Fast, high-quota models with fallback chain
-CANDIDATE_MODELS = [
-    "gemini-3.5-flash-lite",
-    "gemini-3.6-flash",
-    "gemini-3.8-flash"
+# Fast, high-reasoning Groq candidate models
+GROQ_CANDIDATE_MODELS = [
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.8-27b",
+    "openai/gpt-oss-20b",
+    "allam-2-7b"
 ]
 
 class GeminiService:
     def __init__(self):
-        self.api_key = settings.GEMINI_API_KEY
-        self.primary_model = "gemini-3.5-flash-lite"
-        self._client = None
-    
-    @property
-    def client(self) -> genai.Client:
-        if self._client is None:
-            self._client = genai.Client(api_key=self.api_key)
-        return self._client
+        self.groq_api_key = settings.GROQ_API_KEY
+        self.gemini_api_key = settings.GEMINI_API_KEY
+        self.primary_model = "openai/gpt-oss-120b"
 
     def build_system_instruction(self, student_context: Optional[Dict[str, Any]] = None) -> str:
         ctx_str = ""
@@ -67,48 +63,56 @@ Persona & Conversational Guidelines:
         timeout: float = 25.0
     ) -> Dict[str, Any]:
         """
-        Sends message to Gemini API with automatic model fallback and friendly greeting handling.
+        Sends message to Grok / Groq API with automatic model fallback and friendly greeting handling.
         """
         system_instruction = self.build_system_instruction(student_context)
-        combined_prompt = f"System Instruction:\n{system_instruction}\n\nStudent Message:\n{message}"
-
         last_error = None
 
-        # Try candidate models in sequence
-        for model_name in CANDIDATE_MODELS:
-            try:
-                interaction_kwargs = {
-                    "model": model_name,
-                    "input": combined_prompt,
-                    "timeout": timeout
-                }
-                if previous_interaction_id:
-                    interaction_kwargs["previous_interaction_id"] = previous_interaction_id
-
-                interaction = self.client.interactions.create(**interaction_kwargs)
-                output_text = interaction.output_text
-                
-                if output_text and output_text.strip():
-                    suggested_followups = self.generate_quick_followups(message, output_text)
-                    return {
-                        "response": output_text.strip(),
-                        "interaction_id": interaction.id,
-                        "model": model_name,
-                        "status": "success",
-                        "suggested_followups": suggested_followups
-                    }
-            except Exception as e:
-                logger.warning(f"Gemini call failed on model {model_name}: {e}")
-                last_error = e
-                # Continue to next candidate model
+        if self.groq_api_key:
+            for model_name in GROQ_CANDIDATE_MODELS:
+                try:
+                    res = requests.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self.groq_api_key}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": model_name,
+                            "messages": [
+                                {"role": "system", "content": system_instruction},
+                                {"role": "user", "content": message}
+                            ],
+                            "temperature": 0.7,
+                            "max_tokens": 2048
+                        },
+                        timeout=timeout
+                    )
+                    if res.status_code == 200:
+                        data = res.json()
+                        output_text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                        if output_text and output_text.strip():
+                            suggested_followups = self.generate_quick_followups(message, output_text)
+                            return {
+                                "response": output_text.strip(),
+                                "interaction_id": f"grok_{int(time.time() * 1000)}",
+                                "model": model_name,
+                                "status": "success",
+                                "suggested_followups": suggested_followups
+                            }
+                    else:
+                        logger.warning(f"Groq call failed on model {model_name}: {res.text}")
+                except Exception as e:
+                    logger.warning(f"Groq call exception on model {model_name}: {e}")
+                    last_error = e
 
         # If all cloud models fail, use intelligent, intent-aware local response
-        logger.error(f"All Gemini models failed. Last error: {last_error}")
+        logger.error(f"All Groq models failed. Last error: {last_error}")
         fallback_response = self._generate_fallback(message, student_context)
         return {
             "response": fallback_response,
             "interaction_id": f"local_{id(fallback_response)}",
-            "model": "studypath-companion",
+            "model": "studypath-grok-companion",
             "status": "success",
             "suggested_followups": self.generate_quick_followups(message, fallback_response)
         }

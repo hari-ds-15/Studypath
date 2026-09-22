@@ -176,9 +176,9 @@ const FloatingAiAssistant = () => {
                 <div>
                   <h3 className="text-xs font-bold flex items-center gap-1.5 text-stone-900 dark:text-stone-100">
                     StudyPath AI Tutor
-                    <span className="px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[9px] font-bold border border-amber-200 dark:border-amber-500/30">Gemini AI</span>
+                    <span className="px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[9px] font-bold border border-amber-200 dark:border-amber-500/30">Grok AI</span>
                   </h3>
-                  <p className="text-[10px] text-stone-500 dark:text-stone-400">Live Google Gemini 3.5 Flash Companion</p>
+                  <p className="text-[10px] text-stone-500 dark:text-stone-400">Live Grok AI Reasoning Companion</p>
                 </div>
               </div>
 
@@ -270,7 +270,7 @@ const FloatingAiAssistant = () => {
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: '150ms' }} />
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                  <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400 ml-1">Gemini AI synthesizing...</span>
+                  <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400 ml-1">Grok AI synthesizing...</span>
                 </div>
               )}
 

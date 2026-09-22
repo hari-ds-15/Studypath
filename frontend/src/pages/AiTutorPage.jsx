@@ -103,7 +103,7 @@ const AiTutorPage = () => {
       {
         id: 'welcome-1',
         sender: 'bot',
-        text: `👋 Hello **${firstName}**! I am your **StudyPath AI Tutor & Academic Mentor**, powered by **Google Gemini AI**.\n\nI can help you:\n* 🧠 **Master computer science concepts** (Arrays, Linked Lists, Trees, Graphs, DP)\n* 💻 **Write & debug clean code** in Python, SQL, JavaScript, or C++\n* 📅 **Build customized spaced-repetition study timetables** for exams\n* 📝 **Generate interactive diagnostic quiz questions**\n\nWhat subject or topic would you like to master today?`,
+        text: `👋 Hello **${firstName}**! I am your **StudyPath AI Tutor & Academic Mentor**, powered by **Grok AI**.\n\nI can help you:\n* 🧠 **Master computer science concepts** (Arrays, Linked Lists, Trees, Graphs, DP)\n* 💻 **Write & debug clean code** in Python, SQL, JavaScript, or C++\n* 📅 **Build customized spaced-repetition study timetables** for exams\n* 📝 **Generate interactive diagnostic quiz questions**\n\nWhat subject or topic would you like to master today?`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         suggested_followups: [
           'What is an array in data structures?',
@@ -246,11 +246,11 @@ const AiTutorPage = () => {
               <h1 className="text-base sm:text-lg font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
                 StudyPath AI Tutor
               </h1>
-              <Badge variant="amber" size="sm">Gemini AI</Badge>
+              <Badge variant="amber" size="sm">Grok AI</Badge>
             </div>
             <p className="text-[11px] text-stone-500 dark:text-stone-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Live Google Gemini 3.5 Flash Active Recall & Coding Mentor</span>
+              <span>Live Grok AI High-Speed Reasoning & Coding Mentor</span>
             </p>
           </div>
         </div>

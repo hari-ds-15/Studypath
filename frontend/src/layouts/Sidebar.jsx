@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 
 const navigationItems = [
   { name: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
-  { name: 'AI Study Tutor', to: '/ai-tutor', icon: Sparkles, badge: 'GEMINI' },
+  { name: 'AI Study Tutor', to: '/ai-tutor', icon: Sparkles, badge: 'GROK' },
   { name: 'My Learning', to: '/my-learning', icon: BookOpen },
   { name: 'Course Recommendations', to: '/recommendations', icon: Compass, badge: 'AI' },
   { name: 'Study Plan', to: '/study-plan', icon: Calendar },
