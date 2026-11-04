@@ -1,8 +1,76 @@
 import json
 from typing import List, Dict, Any, Tuple
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+import math
+import re
+from collections import Counter
+
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+except Exception:
+    ENGLISH_STOP_WORDS = {
+        "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are",
+        "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but",
+        "by", "could", "did", "do", "does", "doing", "down", "during", "each", "few", "for", "from",
+        "further", "had", "has", "have", "having", "he", "her", "here", "hers", "herself", "him",
+        "himself", "his", "how", "i", "if", "in", "into", "is", "it", "its", "itself", "me", "more",
+        "most", "my", "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other",
+        "ought", "our", "ours", "ourselves", "out", "over", "own", "same", "she", "should", "so",
+        "some", "such", "than", "that", "the", "their", "theirs", "them", "themselves", "then",
+        "there", "these", "they", "this", "those", "through", "to", "too", "under", "until", "up",
+        "very", "was", "we", "were", "what", "when", "where", "which", "while", "who", "whom", "why",
+        "with", "would", "you", "your", "yours", "yourself", "yourselves"
+    }
+
+    class TfidfVectorizer:  # type: ignore
+        def __init__(self, stop_words='english', max_features=1000):
+            self.stop_words = ENGLISH_STOP_WORDS if stop_words == 'english' else set()
+            self.max_features = max_features
+            self.vocabulary_ = {}
+            self.idf_ = None
+
+        def _tokenize(self, text: str) -> List[str]:
+            tokens = re.findall(r'(?u)\b\w\w+\b', text.lower())
+            return [t for t in tokens if t not in self.stop_words]
+
+        def fit_transform(self, raw_documents: List[str]) -> np.ndarray:
+            tokenized_docs = [self._tokenize(doc) for doc in raw_documents]
+            doc_count = len(tokenized_docs)
+            df = Counter()
+            for doc in tokenized_docs:
+                df.update(set(doc))
+
+            most_common = [w for w, _ in df.most_common(self.max_features)]
+            self.vocabulary_ = {w: idx for idx, w in enumerate(most_common)}
+            num_features = len(self.vocabulary_)
+
+            if num_features == 0:
+                return np.zeros((doc_count, 1))
+
+            self.idf_ = np.array([
+                math.log((1 + doc_count) / (1 + df[w])) + 1.0
+                for w in most_common
+            ])
+
+            matrix = np.zeros((doc_count, num_features), dtype=np.float64)
+            for i, doc in enumerate(tokenized_docs):
+                counts = Counter(doc)
+                total = len(doc) or 1
+                for w, idx in self.vocabulary_.items():
+                    if w in counts:
+                        matrix[i, idx] = (counts[w] / total) * self.idf_[idx]
+                norm = np.linalg.norm(matrix[i])
+                if norm > 0:
+                    matrix[i] /= norm
+            return matrix
+
+    def cosine_similarity(a: np.ndarray, b: np.ndarray) -> np.ndarray:  # type: ignore
+        a_norm = np.linalg.norm(a, axis=1, keepdims=True)
+        b_norm = np.linalg.norm(b, axis=1, keepdims=True)
+        a_norm[a_norm == 0] = 1e-9
+        b_norm[b_norm == 0] = 1e-9
+        return np.dot(a / a_norm, (b / b_norm).T)
 
 from app.models.course import Course
 from app.models.profile import StudentProfile

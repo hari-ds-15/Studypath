@@ -1,7 +1,19 @@
 import json
 from typing import List, Dict, Tuple, Optional
 import numpy as np
-from sklearn.decomposition import TruncatedSVD
+try:
+    from sklearn.decomposition import TruncatedSVD
+except Exception:
+    class TruncatedSVD:  # type: ignore
+        def __init__(self, n_components: int = 2, random_state: int = 42):
+            self.n_components = n_components
+            self.components_ = None
+
+        def fit_transform(self, X: np.ndarray) -> np.ndarray:
+            U, S, Vt = np.linalg.svd(X, full_matrices=False)
+            k = min(self.n_components, len(S))
+            self.components_ = Vt[:k, :]
+            return U[:, :k] * S[:k]
 from sqlalchemy.orm import Session
 
 from app.models.course import Course, Enrollment, SavedCourse

@@ -1,7 +1,28 @@
 import json
 from typing import List, Tuple, Dict
 import numpy as np
-from sklearn.neighbors import NearestNeighbors
+try:
+    from sklearn.neighbors import NearestNeighbors
+except Exception:
+    class NearestNeighbors:  # type: ignore
+        def __init__(self, n_neighbors: int = 3, metric: str = 'cosine'):
+            self.n_neighbors = n_neighbors
+            self.metric = metric
+            self.X_ = None
+
+        def fit(self, X: np.ndarray):
+            self.X_ = np.array(X, dtype=np.float64)
+            return self
+
+        def kneighbors(self, query: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+            q = query[0]
+            q_norm = np.linalg.norm(q)
+            x_norms = np.linalg.norm(self.X_, axis=1)
+            denom = (x_norms * q_norm) + 1e-9
+            cos_sim = np.dot(self.X_, q) / denom
+            distances = 1.0 - cos_sim
+            indices = np.argsort(distances)[:self.n_neighbors]
+            return distances[indices].reshape(1, -1), indices.reshape(1, -1)
 from sqlalchemy.orm import Session
 
 from app.models.course import Course, Enrollment
